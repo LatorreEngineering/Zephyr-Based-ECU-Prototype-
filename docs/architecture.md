@@ -38,3 +38,11 @@ This project implements a **fully functional automotive-style ECU** on **Zephyr 
 ---
 
 ## Diagram
+
+[ Sensors ] –> [ ECU FSM ] –> [ Comm Manager ] –> [ CAN / LIN ]
+|
+v
+[ UDS Server ]
+|
+v
+[ DTC Manager ] –> [ NVS Storage ]
