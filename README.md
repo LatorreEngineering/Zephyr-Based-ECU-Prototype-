@@ -75,103 +75,87 @@ ECU Application
 	•	Fault injection (CAN timeout, over-temp, LIN errors)
 	•	Watchdog supervision
 
-# Architecture Overview
-+-------------------------------------------------------------+
-|                         Zephyr RTOS                         |
-|  Threads, Queues, Workqueues, DeviceTree, Kconfig, Drivers  |
-+-----------------------------+-------------------------------+
-                              |
-+-------------------------------------------------------------+
-|                    ECU Prototype Application                |
-+-------------------------------------------------------------+
-|   Diagnostics     |   Network Stack   |       App Logic     |
-|-------------------|-------------------|----------------------|
-| - UDS server      | - CAN Driver      | - State machine      |
-| - DTC manager     | - ISO-TP layer    | - Sensor simulator   |
-| - OBD-II frames   | - LIN driver (*)  | - Fault injection    |
-|   (optional)      | - Transport queues| - Safety monitor     |
-+-------------------+-------------------+----------------------+
-                              |
-+-------------------------------------------------------------+
-|                     Non-volatile Storage                    |
-|              (Zephyr NVS → Flash/EEPROM backend)            |
-+-------------------------------------------------------------+
+# Architecture
+see docs/Architecture.md
 
 ```text
-
 zephyr-ecu-prototype/
-│
 ├─ app/
-│   ├─ main.c
-│   ├─ ecu_state_machine.c
-│   ├─ ecu_state_machine.h
-│   ├─ sensor_sim.c
-│   ├─ sensor_sim.h
-│   ├─ fault_injection.c
-│   ├─ fault_injection.h
-│   ├─ watchdog_supervisor.c
-│   └─ watchdog_supervisor.h
+│  ├─ main.c
+│  ├─ ecu_state_machine.c
+│  ├─ ecu_state_machine.h
+│  ├─ sensor_sim.c
+│  ├─ sensor_sim.h
+│  ├─ fault_injection.c
+│  ├─ fault_injection.h
+│  ├─ watchdog_supervisor.c
+│  └─ watchdog_supervisor.h
 │
 ├─ diagnostics/
-│   ├─ uds_server.c
-│   ├─ uds_server.h
-│   ├─ uds_session.c
-│   ├─ uds_session.h
-│   ├─ dtc_manager.c
-│   ├─ dtc_manager.h
-│   ├─ uds_services/
-│   │     ├─ uds_10_session_control.c
-│   │     ├─ uds_11_ecu_reset.c
-│   │     ├─ uds_14_clear_dtc.c
-│   │     ├─ uds_19_read_dtc.c
-│   │     ├─ uds_22_rdbi.c
-│   │     ├─ uds_23_write_data.c
-│   │     ├─ uds_27_security_access.c
-│   │     ├─ uds_28_communication_control.c
-│   │     ├─ uds_2e_write_did.c
-│   │     ├─ uds_31_routine_control.c
-│   │     ├─ uds_34_request_download.c
-│   │     ├─ uds_36_transfer_data.c
-│   │     └─ uds_37_transfer_exit.c
-│   │
-│   └─ transport/
-│         ├─ isotp_can.c
-│         └─ isotp_can.h
+│  ├─ uds_server.c
+│  ├─ uds_server.h
+│  ├─ uds_session.c
+│  ├─ uds_session.h
+│  ├─ dtc_manager.c
+│  ├─ dtc_manager.h
+│  ├─ uds_services/
+│  │  ├─ uds_10_session_control.c
+│  │  ├─ uds_11_ecu_reset.c
+│  │  ├─ uds_14_clear_dtc.c
+│  │  ├─ uds_19_read_dtc.c
+│  │  ├─ uds_22_rdbi.c
+│  │  ├─ uds_23_write_data.c
+│  │  ├─ uds_27_security_access.c
+│  │  ├─ uds_28_communication_control.c
+│  │  ├─ uds_2e_write_did.c
+│  │  ├─ uds_31_routine_control.c
+│  │  ├─ uds_34_request_download.c
+│  │  ├─ uds_36_transfer_data.c
+│  │  └─ uds_37_transfer_exit.c
+│  └─ transport/
+│     ├─ isotp_can.c
+│     └─ isotp_can.h
 │
 ├─ network/
-│   ├─ can/
-│   │    ├─ can_transport.c
-│   │    └─ can_transport.h
-│   ├─ lin/
-│   │    ├─ lin_driver.c
-│   │    ├─ lin_driver.h
-│   │    ├─ lin_scheduler.c
-│   │    └─ lin_scheduler.h
-│   └─ comm_manager.c
+│  ├─ comm_manager.c
+│  ├─ comm_manager.h
+│  ├─ can/
+│  │  ├─ can_transport.c
+│  │  └─ can_transport.h
+│  ├─ lin/
+│  │  ├─ lin_driver.c
+│  │  ├─ lin_driver.h
+│  │  ├─ lin_scheduler.c
+│  │  └─ lin_scheduler.h
 │
 ├─ storage/
-│   ├─ nvs_dtc_storage.c
-│   └─ nvs_dtc_storage.h
+│  ├─ nvs_dtc_storage.c
+│  └─ nvs_dtc_storage.h
 │
 ├─ boards/
-│   ├─ frdm_k64f.overlay
-│   └─ lin_pins.md
+│  ├─ frdm_k64f.overlay
+│  └─ lin_pins.md
 │
 ├─ tests/
-│   ├─ test_diagnostics/
-│   ├─ test_isotp/
-│   ├─ test_state_machine/
-│   └─ test_lin/
+│  ├─ test_state_machine/
+│  │  └─ main.c
+│  ├─ test_diagnostics/
+│  │  └─ main.c
+│  ├─ test_isotp/
+│  │  └─ main.c
+│  └─ test_lin/
+│     └─ main.c
 │
 ├─ docs/
-│   ├─ architecture.md
-│   ├─ uds_service_matrix.md
-│   ├─ dtc_list.md
-│   └─ diagrams/
+│  ├─ architecture.md
+│  ├─ uds_service_matrix.md
+│  ├─ dtc_list.md
+│  └─ diagrams/   (placeholder)
 │
-├─ Kconfig
 ├─ CMakeLists.txt
+├─ Kconfig
 └─ README.md
+
 
 Tests
 
