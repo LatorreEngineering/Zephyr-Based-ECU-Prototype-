@@ -1,0 +1,15 @@
+menu "ECU Prototype Options"
+
+config ECU_ENABLE_LIN
+    bool "Enable LIN Master"
+    default y
+
+config ECU_ENABLE_UDS
+    bool "Enable full UDS stack"
+    default y
+
+config ECU_FAULT_INJECTION
+    bool "Enable fault injection"
+    default y
+
+endmenu
