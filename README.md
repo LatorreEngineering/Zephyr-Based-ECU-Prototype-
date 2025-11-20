@@ -97,7 +97,7 @@ ECU Application
 |              (Zephyr NVS → Flash/EEPROM backend)            |
 +-------------------------------------------------------------+
 
-
+```text
 
 zephyr-ecu-prototype/
 │
