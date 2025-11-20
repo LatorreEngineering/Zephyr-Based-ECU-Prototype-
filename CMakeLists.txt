@@ -10,15 +10,12 @@ target_sources(app PRIVATE
     app/watchdog_supervisor.c
 
     diagnostics/uds_server.c
-    diagnostics/uds_session.c
     diagnostics/dtc_manager.c
-
     diagnostics/transport/isotp_can.c
 
     network/can/can_transport.c
     network/lin/lin_driver.c
     network/lin/lin_scheduler.c
-    network/comm_manager.c
 
     storage/nvs_dtc_storage.c
 )
