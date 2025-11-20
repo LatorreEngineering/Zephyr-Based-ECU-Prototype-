@@ -1,4 +1,3 @@
-/* Enable CAN0 */
 &can0 {
     status = "okay";
     bus-speed = <500000>;
@@ -8,7 +7,6 @@
     phase-seg2 = <1>;
 };
 
-/* UART for LIN Master */
 &uart3 {
     status = "okay";
     current-speed = <19200>;
