@@ -1,0 +1,64 @@
+name: Zephyr ECU CI
+
+on:
+  push:
+    branches:
+      - main
+      - master
+  pull_request:
+    branches:
+      - main
+      - master
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    env:
+      ZEPHYR_TOOLCHAIN_VARIANT: zephyr
+      ZEPHYR_SDK_INSTALL_DIR: ${{ github.workspace }}/zephyr-sdk
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y git cmake ninja-build gperf \
+            ccache dfu-util device-tree-compiler wget python3-pip \
+            python3-setuptools python3-wheel xz-utils file
+
+      - name: Install Zephyr SDK
+        run: |
+          if [ ! -d "${ZEPHYR_SDK_INSTALL_DIR}" ]; then
+            wget https://github.com/zephyrproject-rtos/sdk-ng/releases/download/v0.17.2/zephyr-sdk-0.17.2-linux-x86_64-setup.run
+            chmod +x zephyr-sdk-0.17.2-linux-x86_64-setup.run
+            ./zephyr-sdk-0.17.2-linux-x86_64-setup.run -- -d ${ZEPHYR_SDK_INSTALL_DIR} -y
+          fi
+
+      - name: Install west
+        run: |
+          pip3 install --upgrade pip
+          pip3 install west
+
+      - name: Initialize Zephyr Project
+        run: |
+          west init zephyrproject
+          cd zephyrproject
+          west update
+          west zephyr-export
+
+      - name: Build for FRDM-K64F
+        run: |
+          west build -b frdm_k64f -p auto
+
+      - name: Build for native_posix (unit tests)
+        run: |
+          west build -b native_posix -p auto
+          west build -t run
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: frdm_k64f_build
+          path: build/zephyr/zephyr.bin
