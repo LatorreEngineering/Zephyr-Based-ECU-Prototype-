@@ -2,63 +2,110 @@ name: Zephyr ECU CI
 
 on:
   push:
-    branches:
-      - main
-      - master
+    branches: [ main, master ]
   pull_request:
-    branches:
-      - main
-      - master
+    branches: [ main, master ]
+
+permissions:
+  contents: read
 
 jobs:
   build:
     runs-on: ubuntu-latest
+
     env:
       ZEPHYR_TOOLCHAIN_VARIANT: zephyr
       ZEPHYR_SDK_INSTALL_DIR: ${{ github.workspace }}/zephyr-sdk
 
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v3
+    # -----------------------------
+    # Checkout
+    # -----------------------------
+    - name: Checkout repository
+      uses: actions/checkout@v4
 
-      - name: Install dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y git cmake ninja-build gperf \
-            ccache dfu-util device-tree-compiler wget python3-pip \
-            python3-setuptools python3-wheel xz-utils file
+    # -----------------------------
+    # Cache Zephyr SDK
+    # -----------------------------
+    - name: Cache Zephyr SDK
+      uses: actions/cache@v4
+      with:
+        path: ${{ github.workspace }}/zephyr-sdk
+        key: zephyr-sdk-v0.17.2
 
-      - name: Install Zephyr SDK
-        run: |
-          if [ ! -d "${ZEPHYR_SDK_INSTALL_DIR}" ]; then
-            wget https://github.com/zephyrproject-rtos/sdk-ng/releases/download/v0.17.2/zephyr-sdk-0.17.2-linux-x86_64-setup.run
-            chmod +x zephyr-sdk-0.17.2-linux-x86_64-setup.run
-            ./zephyr-sdk-0.17.2-linux-x86_64-setup.run -- -d ${ZEPHYR_SDK_INSTALL_DIR} -y
-          fi
+    # -----------------------------
+    # Install system dependencies
+    # -----------------------------
+    - name: Install dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y \
+          git cmake ninja-build gperf ccache dfu-util \
+          device-tree-compiler wget python3-pip \
+          python3-setuptools python3-wheel xz-utils file
 
-      - name: Install west
-        run: |
-          pip3 install --upgrade pip
-          pip3 install west
+    # -----------------------------
+    # Install Zephyr SDK (if not cached)
+    # -----------------------------
+    - name: Install Zephyr SDK
+      if: ${{ steps.cache.outputs.cache-hit != 'true' }}
+      run: |
+        wget https://github.com/zephyrproject-rtos/sdk-ng/releases/download/v0.17.2/zephyr-sdk-0.17.2-linux-x86_64-setup.run
+        chmod +x zephyr-sdk-0.17.2-linux-x86_64-setup.run
+        ./zephyr-sdk-0.17.2-linux-x86_64-setup.run -- -d ${ZEPHYR_SDK_INSTALL_DIR} -y
 
-      - name: Initialize Zephyr Project
-        run: |
-          west init zephyrproject
-          cd zephyrproject
-          west update
-          west zephyr-export
+    # -----------------------------
+    # Install west
+    # -----------------------------
+    - name: Install west
+      run: |
+        pip3 install --upgrade pip
+        pip3 install west
 
-      - name: Build for FRDM-K64F
-        run: |
-          west build -b frdm_k64f -p auto
+    # -----------------------------
+    # Initialize Zephyr workspace
+    # -----------------------------
+    - name: Initialize Zephyr Project
+      run: |
+        west init -l .
+        west update
+        west zephyr-export
 
-      - name: Build for native_posix (unit tests)
-        run: |
-          west build -b native_posix -p auto
-          west build -t run
+    # -----------------------------
+    # Build FRDM-K64F
+    # -----------------------------
+    - name: Build for FRDM-K64F
+      run: |
+        west build -b frdm_k64f -d build/frdm -p auto
 
-      - name: Upload build artifacts
-        uses: actions/upload-artifact@v3
-        with:
-          name: frdm_k64f_build
-          path: build/zephyr/zephyr.bin
+    # -----------------------------
+    # Upload FRDM build artifact
+    # -----------------------------
+    - name: Upload FRDM build artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: frdm_k64f_build
+        path: build/frdm/zephyr/zephyr.bin
+
+    # -----------------------------
+    # Build and run unit tests for native_posix
+    # -----------------------------
+    - name: Build and run native_posix tests
+      run: |
+        for test in test_state_machine test_diagnostics test_isotp test_lin; do
+          west build -b native_posix tests/$test -d build/$test -p auto
+          west build -t run -d build/$test
+        done
+
+    # -----------------------------
+    # Upload native_posix test artifacts
+    # -----------------------------
+    - name: Upload native_posix test artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: native_posix_tests
+        path: |
+          build/test_state_machine/zephyr/zephyr.elf
+          build/test_diagnostics/zephyr/zephyr.elf
+          build/test_isotp/zephyr/zephyr.elf
+          build/test_lin/zephyr/zephyr.elf
