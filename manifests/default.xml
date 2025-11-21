@@ -1,0 +1,131 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Zephyr-Based ECU Prototype - West Manifest
+  
+  This manifest defines the workspace structure for reproducible builds.
+  For CI/CD, use pinned_manifest.xml with locked commit SHAs.
+  
+  Usage:
+    west init -m https://github.com/LatorreEngineering/Zephyr-Based-ECU-Prototype-
+    west update
+-->
+<manifest>
+  <!-- Remote repositories -->
+  <remote name="zephyrproject-rtos" 
+          url-base="https://github.com/zephyrproject-rtos"/>
+  
+  <remote name="latorre-engineering"
+          url-base="https://github.com/LatorreEngineering"/>
+
+  <!-- Default configuration -->
+  <defaults remote="zephyrproject-rtos" 
+            revision="main"/>
+
+  <!-- This repository (application) -->
+  <project name="Zephyr-Based-ECU-Prototype-" 
+           remote="latorre-engineering"
+           revision="main"
+           path="ecu-prototype">
+    <west-commands>scripts/west-commands.yml</west-commands>
+  </project>
+
+  <!-- Zephyr RTOS (latest LTS release v3.7) -->
+  <project name="zephyr" 
+           revision="v3.7-branch"
+           path="zephyr">
+    <west-commands>scripts/west-commands.yml</west-commands>
+  </project>
+
+  <!-- Hardware Abstraction Layer (HAL) modules -->
+  <project name="hal_nxp" 
+           revision="main" 
+           path="modules/hal/nxp"/>
+  
+  <project name="hal_cmsis" 
+           revision="main" 
+           path="modules/hal/cmsis"/>
+
+  <!-- Networking & Protocol Stacks -->
+  <project name="net-tools" 
+           revision="main" 
+           path="tools/net-tools"/>
+
+  <!-- MCUboot (for future secure boot support) -->
+  <project name="mcuboot" 
+           revision="main" 
+           path="bootloader/mcuboot"/>
+
+  <!-- Testing & Validation -->
+  <project name="cmsis" 
+           revision="main" 
+           path="modules/hal/cmsis"
+           groups="hal"/>
+
+  <!-- Trusted Firmware-M (for future ASIL-D support) -->
+  <project name="trusted-firmware-m" 
+           revision="main" 
+           path="modules/tee/tf-m/trusted-firmware-m"
+           groups="tee,tfm"/>
+
+  <!-- Segger RTT (for debugging) -->
+  <project name="segger" 
+           revision="main" 
+           path="modules/debug/segger"
+           groups="debug"/>
+
+  <!-- TinyUSB (for USB diagnostics) -->
+  <project name="tinyusb" 
+           revision="main" 
+           path="modules/lib/tinyusb"
+           groups="usb"/>
+
+  <!-- LittleFS (alternative filesystem for NVS) -->
+  <project name="littlefs" 
+           revision="main" 
+           path="modules/fs/littlefs"
+           groups="fs"/>
+
+  <!-- Loramac-node (placeholder for future wireless) -->
+  <project name="loramac-node" 
+           revision="main" 
+           path="modules/lib/loramac-node"
+           groups="lora"/>
+
+  <!-- LVGL (for future HMI support) -->
+  <project name="lvgl" 
+           revision="master" 
+           path="modules/lib/gui/lvgl"
+           groups="lvgl"/>
+
+  <!-- Mbedtls (for cryptography in security access) -->
+  <project name="mbedtls" 
+           revision="main" 
+           path="modules/crypto/mbedtls"
+           groups="crypto"/>
+
+  <!-- Open-AMP (for multi-core support) -->
+  <project name="open-amp" 
+           revision="main" 
+           path="modules/lib/open-amp"
+           groups="multicore"/>
+
+  <!-- TraceRecorder (Percepio trace for RTOS analysis) -->
+  <project name="TraceRecorderSource" 
+           revision="master" 
+           path="modules/debug/TraceRecorder"
+           groups="debug,trace"/>
+
+  <!-- CANOPENNODE (for future CANopen support) -->
+  <project name="canopennode" 
+           revision="master" 
+           path="modules/lib/canopennode"
+           groups="canopen"/>
+
+  <!-- Group definitions for selective updates -->
+  <!--
+    Usage:
+      west update              # Update all
+      west update -g hal       # Update only HAL modules
+      west update -g debug     # Update only debug tools
+  -->
+</manifest>
