@@ -1,0 +1,118 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Zephyr-Based ECU Prototype - PINNED Manifest for CI/CD
+  
+  ALL REVISIONS ARE LOCKED TO COMMIT SHAs FOR REPRODUCIBILITY.
+  Generated: 2025-01-21 (update quarterly or after major releases)
+  
+  To update:
+    1. west update (using default.xml)
+    2. west manifest --freeze > manifests/pinned_manifest.xml
+    3. Test in CI
+    4. Commit and push
+  
+  Usage in CI:
+    west init -m https://github.com/LatorreEngineering/Zephyr-Based-ECU-Prototype- --mr main
+    west config manifest.file manifests/pinned_manifest.xml
+    west update
+-->
+<manifest>
+  <remote name="zephyrproject-rtos" 
+          url-base="https://github.com/zephyrproject-rtos"/>
+  
+  <remote name="latorre-engineering"
+          url-base="https://github.com/LatorreEngineering"/>
+
+  <defaults remote="zephyrproject-rtos"/>
+
+  <!-- Application (use specific release tag or SHA) -->
+  <project name="Zephyr-Based-ECU-Prototype-" 
+           remote="latorre-engineering"
+           revision="c8f9e2b4a3d5f6e7c8b9a0d1e2f3c4d5e6f7a8b9"
+           path="ecu-prototype"/>
+
+  <!-- Zephyr v3.7.0 LTS (locked to release commit) -->
+  <project name="zephyr" 
+           revision="3c984bcb2e6c3e35b9d3f8c3f9e2a5b7c6d4e5f8"
+           path="zephyr"/>
+
+  <!-- HAL Modules (locked) -->
+  <project name="hal_nxp" 
+           revision="a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0" 
+           path="modules/hal/nxp"/>
+  
+  <project name="hal_cmsis" 
+           revision="b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1" 
+           path="modules/hal/cmsis"/>
+
+  <!-- Networking -->
+  <project name="net-tools" 
+           revision="c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2" 
+           path="tools/net-tools"/>
+
+  <!-- MCUboot (v2.1.0) -->
+  <project name="mcuboot" 
+           revision="d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3" 
+           path="bootloader/mcuboot"/>
+
+  <!-- TF-M (v2.1.0 for ASIL support) -->
+  <project name="trusted-firmware-m" 
+           revision="e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4" 
+           path="modules/tee/tf-m/trusted-firmware-m"/>
+
+  <!-- Segger RTT (latest stable) -->
+  <project name="segger" 
+           revision="f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5" 
+           path="modules/debug/segger"/>
+
+  <!-- TinyUSB (0.16.0) -->
+  <project name="tinyusb" 
+           revision="a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6" 
+           path="modules/lib/tinyusb"/>
+
+  <!-- LittleFS (v2.9.3) -->
+  <project name="littlefs" 
+           revision="b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7" 
+           path="modules/fs/littlefs"/>
+
+  <!-- Mbedtls (3.6.0 for security) -->
+  <project name="mbedtls" 
+           revision="c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8" 
+           path="modules/crypto/mbedtls"/>
+
+  <!-- Open-AMP (multicore support) -->
+  <project name="open-amp" 
+           revision="d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9" 
+           path="modules/lib/open-amp"/>
+
+  <!-- TraceRecorder (4.8.2) -->
+  <project name="TraceRecorderSource" 
+           revision="e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f0" 
+           path="modules/debug/TraceRecorder"/>
+
+  <!-- CANopenNode (v4.0) -->
+  <project name="canopennode" 
+           revision="f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f0a1" 
+           path="modules/lib/canopennode"/>
+
+  <!-- LVGL (v9.0.0 for HMI) -->
+  <project name="lvgl" 
+           revision="a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f0a1b2" 
+           path="modules/lib/gui/lvgl"/>
+
+  <!-- Loramac-node (v4.7.0) -->
+  <project name="loramac-node" 
+           revision="b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f0a1b2c3" 
+           path="modules/lib/loramac-node"/>
+
+  <!--
+    IMPORTANT: These are PLACEHOLDER SHAs for demonstration.
+    
+    To generate actual pinned versions:
+      1. Initialize workspace with default.xml
+      2. Run: west manifest --freeze > manifests/pinned_manifest.xml
+      3. Verify all SHAs are 40-character commits (not branches/tags)
+      4. Test build reproducibility
+      5. Commit to repository
+  -->
+</manifest>
