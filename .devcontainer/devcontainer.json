@@ -1,0 +1,111 @@
+{
+  "name": "Zephyr ECU Development",
+  "build": {
+    "dockerfile": "../Dockerfile",
+    "context": "..",
+    "args": {
+      "ZEPHYR_SDK_VERSION": "0.16.8",
+      "ZEPHYR_VERSION": "v3.7-branch"
+    }
+  },
+  "remoteUser": "developer",
+  "workspaceFolder": "/workspace",
+  "workspaceMount": "source=${localWorkspaceFolder},target=/workspace,type=bind,consistency=cached",
+  "mounts": [
+    "source=${localEnv:HOME}${localEnv:USERPROFILE}/.ccache,target=/workspace/.ccache,type=bind,consistency=cached"
+  ],
+  "runArgs": [
+    "--cap-add=SYS_PTRACE",
+    "--security-opt",
+    "seccomp=unconfined",
+    "--device=/dev/bus/usb"
+  ],
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "ms-vscode.cpptools",
+        "ms-vscode.cpptools-extension-pack",
+        "ms-vscode.cmake-tools",
+        "twxs.cmake",
+        "ms-python.python",
+        "ms-python.vscode-pylance",
+        "donjayamanne.python-extension-pack",
+        "marus25.cortex-debug",
+        "dan-c-underwood.arm",
+        "zixuanwang.linkerscript",
+        "trond-snekvik.kconfig-lang",
+        "trond-snekvik.devicetree",
+        "eamodio.gitlens",
+        "streetsidesoftware.code-spell-checker",
+        "ms-azuretools.vscode-docker",
+        "redhat.vscode-yaml",
+        "tamasfe.even-better-toml",
+        "mechatroner.rainbow-csv"
+      ],
+      "settings": {
+        "terminal.integrated.defaultProfile.linux": "bash",
+        "C_Cpp.default.configurationProvider": "ms-vscode.cmake-tools",
+        "C_Cpp.default.compilerPath": "/opt/zephyr-sdk-0.16.8/arm-zephyr-eabi/bin/arm-zephyr-eabi-gcc",
+        "C_Cpp.default.intelliSenseMode": "gcc-arm",
+        "C_Cpp.default.cStandard": "c11",
+        "C_Cpp.default.cppStandard": "c++17",
+        "cmake.configureOnOpen": false,
+        "cmake.buildDirectory": "${workspaceFolder}/build",
+        "python.defaultInterpreterPath": "/usr/bin/python3",
+        "python.linting.enabled": true,
+        "python.linting.pylintEnabled": true,
+        "python.formatting.provider": "black",
+        "editor.formatOnSave": true,
+        "editor.rulers": [80, 100],
+        "files.associations": {
+          "*.overlay": "dts",
+          "*.dts": "dts",
+          "*.dtsi": "dts",
+          "Kconfig*": "kconfig",
+          "*.conf": "kconfig",
+          "*.defconfig": "kconfig"
+        },
+        "files.exclude": {
+          "**/.git": true,
+          "**/build": true,
+          "**/__pycache__": true,
+          "**/*.pyc": true
+        },
+        "search.exclude": {
+          "**/build": true,
+          "**/zephyr-workspace": true
+        }
+      }
+    }
+  },
+  "features": {
+    "ghcr.io/devcontainers/features/git:1": {
+      "version": "latest"
+    },
+    "ghcr.io/devcontainers/features/github-cli:1": {
+      "version": "latest"
+    }
+  },
+  "postCreateCommand": "bash -c 'echo \"Welcome to Zephyr ECU Development!\" && west --version'",
+  "postStartCommand": "git config --global safe.directory /workspace",
+  "remoteEnv": {
+    "ZEPHYR_BASE": "/workspace/zephyr-workspace/zephyr",
+    "ZEPHYR_SDK_INSTALL_DIR": "/opt/zephyr-sdk-0.16.8",
+    "ZEPHYR_TOOLCHAIN_VARIANT": "zephyr",
+    "PATH": "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/home/developer/.local/bin"
+  },
+  "forwardPorts": [
+    8080,
+    3333
+  ],
+  "portsAttributes": {
+    "8080": {
+      "label": "Documentation Server",
+      "onAutoForward": "notify"
+    },
+    "3333": {
+      "label": "OpenOCD GDB Server",
+      "onAutoForward": "silent"
+    }
+  }
+}
