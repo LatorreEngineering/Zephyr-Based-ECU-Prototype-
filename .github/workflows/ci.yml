@@ -84,6 +84,9 @@ jobs:
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          submodules: recursive
 
       - name: Setup Python
         uses: actions/setup-python@v5
@@ -110,7 +113,11 @@ jobs:
         if: steps.cache.outputs.cache-hit != 'true'
         env:
           ZEPHYR_BASE: ~/zephyr-workspace/zephyr
-        run: ./ci/setup_env.sh
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # Configure git to use GITHUB_TOKEN for private repo access
+          git config --global url."https://${GITHUB_TOKEN}:x-oauth-basic@github.com/".insteadOf "https://github.com/"
+          ./ci/setup_env.sh
 
       - name: Update West (Pinned Manifest)
         working-directory: ~/zephyr-workspace
