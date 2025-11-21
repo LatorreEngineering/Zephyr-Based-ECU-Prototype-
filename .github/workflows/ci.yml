@@ -103,6 +103,9 @@ jobs:
           key: ${{ needs.setup.outputs.zephyr-cache-key }}
           restore-keys: zephyr-${{ env.ZEPHYR_VERSION }}-
 
+      - name: Make setup_env.sh Executable
+        run: chmod +x ./ci/setup_env.sh
+
       - name: Initialize Workspace
         if: steps.cache.outputs.cache-hit != 'true'
         env:
