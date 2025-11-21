@@ -73,7 +73,7 @@ jobs:
           pip install west cmake ninja pyelftools cantools pyyaml
 
 # =========================================================================
-# Job 2: Initialize Zephyr Workspace (Private Repo Fix)
+# Job 2: Initialize Zephyr Workspace (Private Repo)
 # =========================================================================
   init-workspace:
     name: Initialize Zephyr Workspace
@@ -105,21 +105,24 @@ jobs:
       - name: Make setup_env.sh Executable
         run: chmod +x ./ci/setup_env.sh
 
-      - name: Initialize Zephyr Workspace (with token)
+      - name: Initialize Zephyr Workspace
         if: steps.cache.outputs.cache-hit != 'true'
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          ZEPHYR_BASE: ~/zephyr-workspace/zephyr
         run: |
-          # Initialize Zephyr workspace for private repo
-          west init -m https://x-access-token:${GITHUB_TOKEN}@github.com/LatorreEngineering/Zephyr-Based-ECU-Prototype- -b v3.7-branch ~/zephyr-workspace
+          # Initialize West for private repo correctly
+          west init -m https://x-access-token:${GITHUB_TOKEN}@github.com/LatorreEngineering/Zephyr-Based-ECU-Prototype- -b ${ZEPHYR_VERSION} ~/zephyr-workspace
           cd ~/zephyr-workspace
           west update --narrow --fetch-opt=--depth=1
           west zephyr-export
 
-      - name: Run setup_env.sh
-        run: ./ci/setup_env.sh
-        env:
-          ZEPHYR_BASE: ~/zephyr-workspace/zephyr
+      - name: Update West (Pinned Manifest)
+        working-directory: ~/zephyr-workspace
+        run: |
+          west config manifest.file manifests/pinned_manifest.xml
+          west update --narrow --fetch-opt=--depth=1
+          west zephyr-export
 
 # =========================================================================
 # Job 3: Install Zephyr SDK
