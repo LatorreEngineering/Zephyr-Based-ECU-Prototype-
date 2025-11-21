@@ -16,7 +16,7 @@ This project demonstrates a **fully functional automotive-style ECU** implemente
 ✅ **Safety-oriented design** - Watchdog, fault injection, DTC management  
 ✅ **Production CI/CD pipeline** - Reproducible builds, automated testing  
 ✅ **Modular architecture** - AUTOSAR-inspired layer separation  
-✅ **Volvo RFI alignment** - Non-AUTOSAR platform readiness
+✅ ***Aligned with Non-AUTOSAR SDV Raul Latorre Platform Vision** - Non-AUTOSAR platform readiness
 
 ---
 
