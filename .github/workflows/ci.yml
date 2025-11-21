@@ -1,5 +1,12 @@
 name: Zephyr ECU CI/CD Pipeline
 
+# =========================================================================
+# Permissions required for SARIF upload & code scanning
+# =========================================================================
+permissions:
+  contents: read
+  security-events: write
+
 on:
   push:
     branches: [ main, develop, 'feature/**' ]
@@ -30,20 +37,16 @@ jobs:
   setup:
     name: Setup & Validate Environment
     runs-on: ubuntu-22.04
-
     outputs:
       zephyr-cache-key: ${{ steps.keys.outputs.zephyr }}
       sdk-cache-key: ${{ steps.keys.outputs.sdk }}
-
     steps:
-      - name: Checkout Repository
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
         with:
           fetch-depth: 0
           submodules: recursive
 
-      - name: Generate Cache Keys
-        id: keys
+      - id: keys
         run: |
           echo "zephyr=zephyr-${{ env.ZEPHYR_VERSION }}-${{ hashFiles('manifests/pinned_manifest.xml') }}" >> $GITHUB_OUTPUT
           echo "sdk=zephyr-sdk-${{ env.ZEPHYR_SDK_VERSION }}-${{ runner.os }}" >> $GITHUB_OUTPUT
@@ -54,20 +57,17 @@ jobs:
             echo "::error file=manifests/pinned_manifest.xml::Pinned manifest missing."
             exit 1
           fi
-
           if grep -E 'revision="(main|master|v[0-9])"' manifests/pinned_manifest.xml; then
             echo "::warning::Manifest contains branch refs; use SHAs for reproducibility."
             exit 1
           fi
 
-      - name: Setup Python
-        uses: actions/setup-python@v5
+      - uses: actions/setup-python@v5
         with:
           python-version: '3.11'
           cache: pip
 
-      - name: Install Python Dependencies
-        run: |
+      - run: |
           python -m pip install --upgrade pip
           pip install west cmake ninja pyelftools cantools pyyaml
 
@@ -78,19 +78,12 @@ jobs:
     name: Initialize Zephyr Workspace
     runs-on: ubuntu-22.04
     needs: setup
-
     steps:
       - uses: actions/checkout@v4
-
       - uses: actions/setup-python@v5
-        with:
-          python-version: '3.11'
-
-      - name: Install West
-        run: pip install west
-
-      - name: Cache Zephyr Workspace
-        id: cache
+        with: python-version: '3.11'
+      - run: pip install west
+      - id: cache
         uses: actions/cache@v4
         with:
           path: |
@@ -98,13 +91,10 @@ jobs:
             ~/.cache/zephyr
           key: ${{ needs.setup.outputs.zephyr-cache-key }}
           restore-keys: zephyr-${{ env.ZEPHYR_VERSION }}-
-
       - name: Initialize Workspace
         if: steps.cache.outputs.cache-hit != 'true'
         run: ./ci/setup_env.sh
-        env:
-          ZEPHYR_BASE: ~/zephyr-workspace/zephyr
-
+        env: { ZEPHYR_BASE: ~/zephyr-workspace/zephyr }
       - name: Update West (Pinned Manifest)
         working-directory: ~/zephyr-workspace
         run: |
@@ -119,15 +109,12 @@ jobs:
     name: Install Zephyr SDK
     runs-on: ubuntu-22.04
     needs: setup
-
     steps:
-      - name: Cache SDK
-        id: cache
+      - id: cache
         uses: actions/cache@v4
         with:
           path: ~/zephyr-sdk-${{ env.ZEPHYR_SDK_VERSION }}
           key: ${{ needs.setup.outputs.sdk-cache-key }}
-
       - name: Download & Install SDK
         if: steps.cache.outputs.cache-hit != 'true'
         run: |
@@ -136,37 +123,31 @@ jobs:
           ~/zephyr-sdk-${ZEPHYR_SDK_VERSION}/setup.sh -t arm-zephyr-eabi -h -c
 
   # =========================================================================
-  # Job 4: Build Firmware (FRDM-K64F)
+  # Job 4: Build Firmware
   # =========================================================================
   build-hardware:
     name: Build for FRDM-K64F
     runs-on: ubuntu-22.04
     needs: [init-workspace, install-sdk]
-
     steps:
       - uses: actions/checkout@v4
-
       - uses: actions/cache@v4
         with:
           path: |
             ~/zephyr-workspace
             ~/zephyr-sdk-${{ env.ZEPHYR_SDK_VERSION }}
           key: ${{ needs.setup.outputs.zephyr-cache-key }}
-
       - name: Build Firmware
         run: |
           export ZEPHYR_BASE=~/zephyr-workspace/zephyr
           export ZEPHYR_SDK_INSTALL_DIR=~/zephyr-sdk-${ZEPHYR_SDK_VERSION}
           ./ci/build_halo.sh
-
       - name: Generate Build Metadata
         run: |
           echo "BUILD_SHA=$(git rev-parse HEAD)" > build_info.txt
           echo "BUILD_TIME=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> build_info.txt
           echo "ZEPHYR_VERSION=${ZEPHYR_VERSION}" >> build_info.txt
-
-      - name: Upload Firmware Artifacts
-        uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v4
         with:
           name: firmware-frdm-k64f
           path: |
@@ -183,15 +164,12 @@ jobs:
     name: Build & Run Unit Tests
     runs-on: ubuntu-22.04
     needs: init-workspace
-
     steps:
       - uses: actions/checkout@v4
-
       - uses: actions/cache@v4
         with:
           path: ~/zephyr-workspace
           key: ${{ needs.setup.outputs.zephyr-cache-key }}
-
       - name: Run Tests
         run: |
           export ZEPHYR_BASE=~/zephyr-workspace/zephyr
@@ -200,7 +178,6 @@ jobs:
             west build -b native_posix -p auto $t
             ./build/zephyr/zephyr.exe
           done
-
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -216,23 +193,18 @@ jobs:
     runs-on: ubuntu-22.04
     needs: build-hardware
     if: github.event.inputs.run_experiments == 'true' || github.event_name == 'schedule'
-
     steps:
       - uses: actions/checkout@v4
-
       - uses: actions/download-artifact@v4
         with:
           name: firmware-frdm-k64f
           path: build/
-
       - name: Setup Simulation Tools
         run: |
           sudo apt-get update
           sudo apt-get install -y can-utils python3-can
-
       - run: ./ci/run_experiment.sh
       - run: python3 ci/analyze_vbs.py --input results/experiment_data.vbs --output results/analysis.csv
-
       - uses: actions/upload-artifact@v4
         with:
           name: experimental-results
@@ -245,36 +217,26 @@ jobs:
   static-analysis:
     name: Static Code Analysis
     runs-on: ubuntu-22.04
-
     steps:
       - uses: actions/checkout@v4
-
       - name: Install Cppcheck
         run: sudo apt-get update && sudo apt-get install -y cppcheck
-
       - name: Run Cppcheck
         run: |
-          # NOTE: We use non-blocking static analysis for the moment.
-          #       In a future milestone we will shift to strict/MISRA-style enforcement (Option C).
-          cppcheck \
-            --enable=all \
-            --error-exitcode=0 \
-            --inline-suppr \
-            --suppress=missingIncludeSystem \
-            --suppress=unusedFunction \
-            -I app \
-            -I network \
-            -I diagnostics \
-            --xml --xml-version=2 \
-            app/ network/ diagnostics/ \
-            2> cppcheck-report.xml
-
+          # NOTE: Currently non-blocking; future MISRA/C enforcement planned (Option C)
+          cppcheck --enable=all \
+                   --error-exitcode=0 \
+                   --inline-suppr \
+                   --suppress=missingIncludeSystem \
+                   --suppress=unusedFunction \
+                   -I app -I network -I diagnostics \
+                   --xml --xml-version=2 \
+                   app/ network/ diagnostics/ 2> cppcheck-report.xml
       - uses: actions/upload-artifact@v4
         with:
           name: cppcheck-report
           path: cppcheck-report.xml
           retention-days: 14
-
       - name: Check clang-format (non-blocking)
         run: |
           sudo apt-get install -y clang-format-14
@@ -287,18 +249,17 @@ jobs:
   security-scan:
     name: Security Vulnerability Scan
     runs-on: ubuntu-22.04
-
     steps:
       - uses: actions/checkout@v4
-
       - uses: aquasecurity/trivy-action@master
         with:
           scan-type: fs
           scan-ref: .
           format: sarif
           output: trivy-results.sarif
-
-      - uses: github/codeql-action/upload-sarif@v3
+      - name: Upload SARIF (v4)
+        uses: github/codeql-action/upload-sarif@v4
+        if: ${{ github.repository == github.event.pull_request.head.repo.full_name || github.event_name != 'pull_request' }}
         with:
           sarif_file: trivy-results.sarif
 
@@ -308,14 +269,10 @@ jobs:
   documentation:
     name: Generate Documentation
     runs-on: ubuntu-22.04
-
     steps:
       - uses: actions/checkout@v4
-
       - run: sudo apt-get install -y doxygen graphviz
-
       - run: doxygen Doxyfile || echo "::warning::Doxyfile missing, skipping."
-
       - uses: actions/upload-artifact@v4
         with:
           name: documentation
@@ -323,14 +280,13 @@ jobs:
           retention-days: 30
 
   # =========================================================================
-  # Job 10: Summary
+  # Job 10: CI Summary
   # =========================================================================
   summary:
     name: CI Summary
     runs-on: ubuntu-22.04
     needs: [ build-hardware, build-tests, static-analysis ]
     if: always()
-
     steps:
       - name: Generate Summary
         run: |
