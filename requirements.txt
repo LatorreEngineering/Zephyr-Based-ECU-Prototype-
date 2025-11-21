@@ -1,0 +1,52 @@
+# =============================================================================
+# Zephyr ECU Prototype - Python Dependencies
+# =============================================================================
+# Install with: pip install -r requirements.txt
+# For development: pip install -r requirements-dev.txt
+# =============================================================================
+
+# Zephyr Core Tools
+west==1.2.0
+pyelftools==0.31
+kconfiglib==14.1.0
+pyyaml==6.0.1
+
+# CAN/Automotive Tools
+python-can==4.3.1
+cantools==39.4.5
+isotp==1.9
+
+# Serial Communication
+pyserial==3.5
+
+# Data Analysis
+pandas==2.1.4
+numpy==1.26.2
+matplotlib==3.8.2
+
+# Binary Formats
+intelhex==2.3.0
+crcmod==1.7
+
+# Testing
+pytest==7.4.3
+pytest-cov==4.1.0
+pytest-timeout==2.2.0
+pytest-xdist==3.5.0
+
+# Code Quality
+black==23.12.1
+pylint==3.0.3
+mypy==1.7.1
+flake8==7.0.0
+
+# Documentation
+sphinx==7.2.6
+sphinx-rtd-theme==2.0.0
+breathe==4.35.0
+
+# Utilities
+click==8.1.7
+colorama==0.4.6
+tabulate==0.9.0
+tqdm==4.66.1
