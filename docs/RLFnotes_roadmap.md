@@ -1,4 +1,4 @@
-# Non-AUTOSAR Alignment Status
+# Non-AUTOSAR Zephyr Based ECU Alignment Status
 
 ## Phase 1: Foundation ✅ COMPLETE
 
