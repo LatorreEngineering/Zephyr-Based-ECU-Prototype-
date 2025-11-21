@@ -105,20 +105,21 @@ jobs:
       - name: Make setup_env.sh Executable
         run: chmod +x ./ci/setup_env.sh
 
-      - name: Initialize Workspace
+      - name: Initialize Zephyr Workspace (with token)
         if: steps.cache.outputs.cache-hit != 'true'
         env:
-          ZEPHYR_BASE: ~/zephyr-workspace/zephyr
-          WEST_MANIFEST_URL: https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/LatorreEngineering/Zephyr-Based-ECU-Prototype-
-          WEST_MANIFEST_BRANCH: v3.7-branch
-        run: ./ci/setup_env.sh
-
-      - name: Update West (Pinned Manifest)
-        working-directory: ~/zephyr-workspace
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          west config manifest.file manifests/pinned_manifest.xml
+          # Initialize Zephyr workspace for private repo
+          west init -m https://x-access-token:${GITHUB_TOKEN}@github.com/LatorreEngineering/Zephyr-Based-ECU-Prototype- -b v3.7-branch ~/zephyr-workspace
+          cd ~/zephyr-workspace
           west update --narrow --fetch-opt=--depth=1
           west zephyr-export
+
+      - name: Run setup_env.sh
+        run: ./ci/setup_env.sh
+        env:
+          ZEPHYR_BASE: ~/zephyr-workspace/zephyr
 
 # =========================================================================
 # Job 3: Install Zephyr SDK
@@ -203,6 +204,7 @@ jobs:
             echo "Running test: $t"
             west build -b native_posix -p auto $t
             ./build/zephyr/zephyr.exe
+
       - uses: actions/upload-artifact@v4
         if: always()
         with:
