@@ -1,177 +1,347 @@
-# Zephyr-Based-ECU-Prototype-
+# Zephyr-Based ECU Prototype
 
-FRDM-K64F | CAN + LIN + ISO-TP + Full UDS | Real ECU Architecture
+[![CI Status](https://github.com/LatorreEngineering/Zephyr-Based-ECU-Prototype-/workflows/CI/badge.svg)](https://github.com/LatorreEngineering/Zephyr-Based-ECU-Prototype-/actions)
+[![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
+[![Zephyr](https://img.shields.io/badge/Zephyr-v3.7-blue)](https://github.com/zephyrproject-rtos/zephyr)
 
-This project demonstrates a fully functional automotive-style ECU implemented on top of the Zephyr RTOS, targeting the NXP FRDM-K64F.
+**Production-ready automotive ECU architecture on Zephyr RTOS**  
+**Aligned with Non-AUTOSAR SDV Raul Latorre Platform Vision**
 
-It includes:
+##  Project Overview
 
-✔ CAN bus communication
+This project demonstrates a **fully functional automotive-style ECU** implemented on the Zephyr RTOS, targeting the **NXP FRDM-K64F** development board. It provides a complete reference architecture for next-generation ECUs with:
 
-✔ LIN Master implementation (UART-based)
+✅ **Complete UDS diagnostics stack** (ISO 14229) - 13 services  
+✅ **Multi-protocol support** - CAN, LIN, ISO-TP  
+✅ **Safety-oriented design** - Watchdog, fault injection, DTC management  
+✅ **Production CI/CD pipeline** - Reproducible builds, automated testing  
+✅ **Modular architecture** - AUTOSAR-inspired layer separation  
+✅ **Volvo RFI alignment** - Non-AUTOSAR platform readiness
 
-✔ Full UDS diagnostics stack (ISO 14229)
+---
 
-✔ ISO-TP transport over CAN
+## 📡 Key Features
 
-✔ DTC storage using Zephyr NVS subsystem
+### Network Layer
+- **CAN Bus**: Low-level driver via Zephyr CAN API
+- **ISO-TP**: Transport layer for diagnostic communication
+- **LIN Master**: UART-based LIN with schedule tables
+- **Queue-based architecture**: Asynchronous message handling
 
-✔ Real ECU behavior (state machine, sensor simulation, watchdog)
+### Diagnostics (UDS ISO 14229)
+Complete implementation of 13 UDS services:
 
-✔ Fault injection & error handling
+| Service | Description | Status |
+|---------|-------------|--------|
+| 0x10 | Diagnostic Session Control | ✅ |
+| 0x11 | ECU Reset | ✅ |
+| 0x14 | Clear Diagnostics | ✅ |
+| 0x19 | Read DTC | ✅ |
+| 0x22 | Read Data By Identifier | ✅ |
+| 0x23 | Read Memory By Address | ✅ |
+| 0x27 | Security Access (Seed/Key) | ✅ |
+| 0x28 | Communication Control | ✅ |
+| 0x2E | Write Data By Identifier | ✅ |
+| 0x31 | Routine Control | ✅ |
+| 0x34 | Request Download | ✅ |
+| 0x36 | Transfer Data | ✅ |
+| 0x37 | Transfer Exit | ✅ |
 
-✔ Clean, Autosar-inspired architecture
+### Application Layer
+- **ECU State Machine**: Ignition states, mode management
+- **Sensor Simulation**: RPM, temperature, voltage
+- **Fault Injection**: CAN timeout, over-temp, LIN errors
+- **Watchdog Supervision**: System health monitoring
+- **DTC Manager**: ISO-compliant fault memory with NVS persistence
 
-⸻
+---
 
-🛠 Supported Board
+##  Architecture
 
-FRDM-K64F
-	•	Kinetis K64 MCU
-	•	Integrated CAN controller
-	•	Excellent Zephyr support
-	•	LIN via UART (external transceiver recommended)
-
-⸻
-
-📡 Features
-
-CAN
-	•	Low-level driver via Zephyr CAN API
-	•	ISO-TP transport layer
-	•	Queue-based communication manager
-
-LIN
-	•	UART-timed LIN master
-	•	Schedule tables
-	•	PID computation, checksum, sync break generation
-	•	Deterministic slot timing
-
-UDS – FULL IMPLEMENTATION
-
-Supported services:
-	•	0x10 Diagnostic Session Control
-	•	0x11 ECU Reset
-	•	0x14 Clear Diagnostics
-	•	0x19 Read DTC
-	•	0x22 Read Data By Identifier
-	•	0x23 Write Data By Identifier
-	•	0x27 Security Access (seed/key)
-	•	0x28 Communication Control
-	•	0x2E WriteDataByIdentifier
-	•	0x31 Routine Control
-	•	0x34 Request Download
-	•	0x36 Transfer Data
-	•	0x37 Transfer Exit
-
-DTC Manager
-	•	ISO 14229 compliant status bytes
-	•	Occurrence counters
-	•	Persistent storage in NVS
-
-ECU Application
-	•	Ignition state machine
-	•	Sensor value simulation (RPM, temperature, voltage)
-	•	Fault injection (CAN timeout, over-temp, LIN errors)
-	•	Watchdog supervision
-
-# Architecture
-see docs/Architecture.md
-
-```text
+```
 zephyr-ecu-prototype/
-├─ app/
-│  ├─ main.c
-│  ├─ ecu_state_machine.c
-│  ├─ ecu_state_machine.h
-│  ├─ sensor_sim.c
-│  ├─ sensor_sim.h
-│  ├─ fault_injection.c
-│  ├─ fault_injection.h
-│  ├─ watchdog_supervisor.c
-│  └─ watchdog_supervisor.h
+├── app/                    # Application layer
+│   ├── main.c
+│   ├── ecu_state_machine.*
+│   ├── sensor_sim.*
+│   ├── fault_injection.*
+│   └── watchdog_supervisor.*
 │
-├─ diagnostics/
-│  ├─ uds_server.c
-│  ├─ uds_server.h
-│  ├─ uds_session.c
-│  ├─ uds_session.h
-│  ├─ dtc_manager.c
-│  ├─ dtc_manager.h
-│  ├─ uds_services/
-│  │  ├─ uds_10_session_control.c
-│  │  ├─ uds_11_ecu_reset.c
-│  │  ├─ uds_14_clear_dtc.c
-│  │  ├─ uds_19_read_dtc.c
-│  │  ├─ uds_22_rdbi.c
-│  │  ├─ uds_23_write_data.c
-│  │  ├─ uds_27_security_access.c
-│  │  ├─ uds_28_communication_control.c
-│  │  ├─ uds_2e_write_did.c
-│  │  ├─ uds_31_routine_control.c
-│  │  ├─ uds_34_request_download.c
-│  │  ├─ uds_36_transfer_data.c
-│  │  └─ uds_37_transfer_exit.c
-│  └─ transport/
-│     ├─ isotp_can.c
-│     └─ isotp_can.h
+├── diagnostics/            # UDS implementation
+│   ├── uds_server.*
+│   ├── uds_session.*
+│   ├── dtc_manager.*
+│   ├── uds_services/       # Individual UDS services
+│   └── transport/          # ISO-TP layer
 │
-├─ network/
-│  ├─ comm_manager.c
-│  ├─ comm_manager.h
-│  ├─ can/
-│  │  ├─ can_transport.c
-│  │  └─ can_transport.h
-│  ├─ lin/
-│  │  ├─ lin_driver.c
-│  │  ├─ lin_driver.h
-│  │  ├─ lin_scheduler.c
-│  │  └─ lin_scheduler.h
+├── network/                # Network protocols
+│   ├── comm_manager.*
+│   ├── can/
+│   └── lin/
 │
-├─ storage/
-│  ├─ nvs_dtc_storage.c
-│  └─ nvs_dtc_storage.h
+├── storage/                # Persistent storage
+│   └── nvs_dtc_storage.*
 │
-├─ boards/
-│  ├─ frdm_k64f.overlay
-│  └─ lin_pins.md
+├── ci/                     # CI/CD scripts
+│   ├── setup_env.sh
+│   ├── build_halo.sh
+│   ├── run_experiment.sh
+│   └── analyze_vbs.py
 │
-├─ tests/
-│  ├─ test_state_machine/
-│  │  └─ main.c
-│  ├─ test_diagnostics/
-│  │  └─ main.c
-│  ├─ test_isotp/
-│  │  └─ main.c
-│  └─ test_lin/
-│     └─ main.c
+├── manifests/              # West workspace
+│   ├── default.xml
+│   └── pinned_manifest.xml
 │
-├─ docs/
-│  ├─ architecture.md
-│  ├─ uds_service_matrix.md
-│  ├─ dtc_list.md
-│  └─ diagrams/   (placeholder)
+├── tests/                  # Unit tests
+│   ├── test_state_machine/
+│   ├── test_diagnostics/
+│   ├── test_isotp/
+│   └── test_lin/
 │
-├─ CMakeLists.txt
-├─ Kconfig
-└─ README.md
+└── docs/                   # Documentation
+    ├── architecture.md
+    ├── ci_pipeline.md
+    └── safety_readiness.md
+```
 
+---
 
-Tests
+##  Quick Start
 
-Unit tests built on native_posix:
-	•	UDS parsing
-	•	ISO-TP segment reassembly
-	•	DTC persistence
-	•	LIN timing + scheduler simulation
-	•	FSM logic
+### Option 1: Docker (Recommended)
 
-⸻
+```bash
+# Build container
+docker build -t zephyr-ecu:latest .
 
-📄 License
-Apache 2.0 
+# Run interactive session
+docker run -it --rm \
+  -v $(pwd):/workspace \
+  -v ~/.ccache:/workspace/.ccache \
+  zephyr-ecu:latest
 
+# Inside container
+source ci/setup_env.sh
+ci/build_halo.sh
+```
 
-Build
+### Option 2: Native Installation
+
+#### Prerequisites
+- Ubuntu 22.04 (or compatible Linux distribution)
+- Python 3.8+
+- CMake 3.20+
+- Git
+
+#### Setup
+
+```bash
+# Clone repository
+git clone https://github.com/LatorreEngineering/Zephyr-Based-ECU-Prototype-.git
+cd Zephyr-Based-ECU-Prototype-
+
+# Run setup script
+./ci/setup_env.sh
+
+# Source environment
+source .env.ci
+
+# Build firmware
+./ci/build_halo.sh
+```
+
+---
+
+## 🔧 Build System
+
+### Building for Hardware (FRDM-K64F)
+
+```bash
+# Standard build
 west build -b frdm_k64f -p auto .
 
+# Clean build
+west build -b frdm_k64f -p always .
+
+# Flash to board
+west flash
+
+# View console output
+west attach
+```
+
+### Building Tests (native_posix)
+
+```bash
+# Build and run state machine tests
+west build -b native_posix tests/test_state_machine
+./build/zephyr/zephyr.exe
+
+# Build ISO-TP tests
+west build -b native_posix tests/test_isotp
+./build/zephyr/zephyr.exe
+
+# Build LIN tests
+west build -b native_posix tests/test_lin
+./build/zephyr/zephyr.exe
+```
+
+---
+
+##  Testing & Validation
+
+### Unit Tests
+
+```bash
+# Run all tests
+pytest tests/ -v
+
+# Run with coverage
+pytest tests/ --cov=. --cov-report=html
+```
+
+### Experimental Validation
+
+```bash
+# Run 60-second CAN/LIN experiment
+./ci/run_experiment.sh --duration 60
+
+# Analyze results
+python3 ci/analyze_vbs.py \
+  --input results/experiment.vbs \
+  --output results/analysis.csv
+```
+
+### Static Analysis
+
+```bash
+# Run cppcheck
+cppcheck --enable=all \
+  -I app -I network -I diagnostics \
+  app/ network/ diagnostics/
+
+# Check code formatting
+find . -name "*.c" -o -name "*.h" | \
+  xargs clang-format --dry-run --Werror
+```
+
+---
+
+## 📊 CI/CD Pipeline
+
+The project includes a complete GitHub Actions workflow:
+
+- ✅ **Environment setup** with cached dependencies
+- ✅ **Multi-board builds** (FRDM-K64F + native_posix)
+- ✅ **Automated testing** with coverage reports
+- ✅ **Static analysis** (cppcheck, clang-format)
+- ✅ **Security scanning** (Trivy)
+- ✅ **Experimental validation** with VBS data collection
+- ✅ **Documentation generation** (Doxygen)
+
+**Status**: [![CI](https://github.com/LatorreEngineering/Zephyr-Based-ECU-Prototype-/workflows/CI/badge.svg)](https://github.com/LatorreEngineering/Zephyr-Based-ECU-Prototype-/actions)
+
+---
+
+## 🛠️ Supported Hardware
+
+### Primary Target: FRDM-K64F
+- **MCU**: NXP Kinetis K64F (ARM Cortex-M4 @ 120 MHz)
+- **Flash**: 1 MB
+- **RAM**: 256 KB
+- **CAN**: Integrated FlexCAN controller
+- **LIN**: UART-based (external transceiver recommended)
+
+### Future Targets
+- NXP S32K series
+- STM32F7 series
+- Renesas RH850
+
+---
+
+## 📚 Documentation
+
+Comprehensive documentation available in `docs/`:
+
+- **[Architecture Guide](docs/architecture.md)** - System design and module interactions
+- **[CI/CD Pipeline](docs/ci_pipeline.md)** - Build automation and testing
+- **[Safety Readiness](docs/safety_readiness.md)** - ASIL compliance roadmap
+- **[UDS Service Matrix](docs/uds_service_matrix.md)** - Diagnostic services reference
+- **[DTC List](docs/dtc_list.md)** - Fault code definitions
+
+---
+
+## Zephyr-Based ECU Development Roadmap 🎯 
+
+### Phase 1: Foundation (Current)
+- ✅ Zephyr RTOS integration
+- ✅ Basic CAN/LIN communication
+- ✅ UDS diagnostics
+- ✅ Reproducible CI/CD
+
+### Phase 2: Maturation (Q4 2025)
+- ⬜ Multi-core support (AMP/SMP)
+- ⬜ Secure boot (MCUboot)
+- ⬜ OTA updates
+- ⬜ FMEA documentation
+
+### Phase 3: Safety Certification (Q1 2026)
+- ⬜ ASIL-B compliance
+- ⬜ Formal verification
+- ⬜ Safety manual
+- ⬜ Tool qualification
+
+---
+
+## 🔒 Security
+
+Security features:
+- ✅ Seed/key authentication (UDS 0x27)
+- ✅ Secure session management
+- ✅ Memory access protection
+- ⬜ Secure boot (planned)
+- ⬜ Cryptographic verification (planned)
+
+Report security issues to: security@latorreengineering.com
+
+---
+
+## 🤝 Contributing
+
+Please see [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
+
+### Development Workflow
+
+1. **Fork** the repository
+2. **Create** a feature branch: `git checkout -b feature/my-feature`
+3. **Commit** changes: `git commit -am 'Add feature'`
+4. **Push** to branch: `git push origin feature/my-feature`
+5. **Submit** a Pull Request
+
+---
+
+## 📄 License
+
+This project is licensed under the **Apache License 2.0**.  
+See [LICENSE](LICENSE) for details.
+
+---
+
+## 📧 Contact
+
+**Latorre Engineering**  
+Website: https://www.linkedin.com/in/raul-latorre-fortes-631b7130/
+Email: raul.latorre+guithub@gmail.com
+GitHub: [@LatorreEngineering](https://github.com/LatorreEngineering)
+
+---
+
+## 🌟 Acknowledgments
+
+- **Zephyr Project** - RTOS foundation
+- **NXP Semiconductors** - FRDM-K64F support
+- **ISO** - UDS and diagnostic standards
+
+---
+
+**⭐ If this project helps you, please consider starring it on GitHub!**
