@@ -1,0 +1,23 @@
+<manifest>
+  <project name="zephyr"
+           path="zephyr"
+           revision="{{ZEPHYR_SHA}}"
+           url="https://github.com/zephyrproject-rtos/zephyr.git">
+  </project>
+
+  <!-- Add modules ONLY if your ECU project depends on them -->
+  <remote name="zephyrproject"
+          url-base="https://github.com/zephyrproject-rtos"/>
+
+  <projects>
+    <project name="hal_nxp"
+             path="modules/hal/nxp"
+             remote="zephyrproject"
+             revision="main" />
+
+    <project name="cmsis"
+             path="modules/hal/cmsis"
+             remote="zephyrproject"
+             revision="main" />
+  </projects>
+</manifest>
