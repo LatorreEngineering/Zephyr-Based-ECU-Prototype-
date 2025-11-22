@@ -70,19 +70,24 @@ fetch_zephyr_sha() {
 }
 
 # ---------------------------------------------------------------------------
-# Patch pinned manifest with SHA
+# Patch pinned manifest with SHA safely
 # ---------------------------------------------------------------------------
 patch_pinned_manifest() {
     log_step "Patching Pinned Manifest with Zephyr SHA"
-    if [ ! -f "${PROJECT_ROOT}/${WEST_MANIFEST_FILE}" ]; then
-        log_error "Pinned manifest not found: ${PROJECT_ROOT}/${WEST_MANIFEST_FILE}"
+    local manifest="${PROJECT_ROOT}/${WEST_MANIFEST_FILE}"
+    if [ ! -f "$manifest" ]; then
+        log_error "Pinned manifest not found: $manifest"
         exit 1
     fi
 
     local sha
     sha=$(fetch_zephyr_sha)
 
-    sed -i "s|revision=\"[^\"]*\"|revision=\"$sha\"|" "${PROJECT_ROOT}/${WEST_MANIFEST_FILE}"
+    # Escape potential special characters in SHA
+    local safe_sha
+    safe_sha=$(printf '%s\n' "$sha" | sed 's/[&/\]/\\&/g')
+
+    sed -i "s|revision=\"[^\"]*\"|revision=\"$safe_sha\"|" "$manifest"
     log_info "✅ Pinned manifest patched successfully"
 }
 
@@ -123,12 +128,11 @@ init_workspace() {
         west init -m "$WEST_MANIFEST_URL" -b "$WEST_MANIFEST_BRANCH" .
     else
         log_info "Using local manifest file"
-        west init -l "${WORKSPACE_DIR}"
+        west init -l .
     fi
 
     # Configure west to use pinned manifest
     west config manifest.file "${PROJECT_ROOT}/${WEST_MANIFEST_FILE}"
-
     log_info "✅ Workspace initialized"
 }
 
@@ -176,7 +180,7 @@ verify_installation() {
 generate_env_file() {
     log_step "Generating Environment Configuration"
     local env_file="${PROJECT_ROOT}/.env.ci"
-    cat > "${env_file}" <<EOF
+    cat > "$env_file" <<EOF
 # Zephyr ECU CI Environment Configuration
 # Generated: $(date -u +%Y-%m-%dT%H:%M:%SZ)
 
@@ -188,8 +192,8 @@ export PROJECT_ROOT="${PROJECT_ROOT}"
 export WORKSPACE_DIR="${WORKSPACE_DIR}"
 export CMAKE_PREFIX_PATH="\${ZEPHYR_BASE}"
 EOF
-    log_info "Environment file created: ${env_file}"
-    log_info "Source it with: source ${env_file}"
+    log_info "Environment file created: $env_file"
+    log_info "Source it with: source $env_file"
     log_info "✅ Environment configured"
 }
 
@@ -212,13 +216,3 @@ main() {
 
     log_step "✅ Setup Complete!"
     echo ""
-    log_info "Next steps:"
-    log_info "  1. Source environment: source ${PROJECT_ROOT}/.env.ci"
-    log_info "  2. Build firmware: ./ci/build_halo.sh"
-    log_info "  3. Run tests: west build -b native_posix tests/test_state_machine"
-    echo ""
-}
-
-# Run main function
-main "$@"
-
