@@ -1,23 +1,35 @@
-#!/bin/bash
-set -e
+#!/usr/bin/env bash
+set -euo pipefail
 
-# Ensure zephyr_sha.txt exists
-if [ ! -f zephyr_sha.txt ]; then
-  echo "[ERROR] zephyr_sha.txt not found. Run the SHA fetch step first."
-  exit 1
-fi
+# -------------------------------------------------------------------
+# Patches pinned_manifest.xml with a specific Zephyr SHA
+# -------------------------------------------------------------------
 
-ZEHPYR_SHA=$(cat zephyr_sha.txt)
 MANIFEST_FILE="manifests/pinned_manifest.xml"
 
-if [ ! -f "$MANIFEST_FILE" ]; then
-  echo "[ERROR] $MANIFEST_FILE not found!"
-  exit 1
+# Fetch SHA from file or environment variable
+if [ -n "${ZEPHYR_SHA:-}" ]; then
+    SHA="$ZEPHYR_SHA"
+elif [ -f zephyr_sha.txt ]; then
+    SHA=$(<zephyr_sha.txt)
+else
+    echo "[ERROR] Zephyr SHA not provided. Set ZEPHYR_SHA or create zephyr_sha.txt"
+    exit 1
 fi
 
-echo "[INFO] Patching pinned_manifest.xml with Zephyr SHA: $ZEHPYR_SHA"
+# Trim whitespace just in case
+SHA=$(echo "$SHA" | tr -d '[:space:]')
 
-# Replace any Zephyr revision in the manifest with the exact SHA
-sed -i "s|revision=\"[^\"]*\"|revision=\"$ZEHPYR_SHA\"|" "$MANIFEST_FILE"
+# Check manifest exists
+if [ ! -f "$MANIFEST_FILE" ]; then
+    echo "[ERROR] Manifest file not found: $MANIFEST_FILE"
+    exit 1
+fi
 
-echo "[INFO] patched $MANIFEST_FILE successfully"
+echo "[INFO] Patching $MANIFEST_FILE with Zephyr SHA: $SHA"
+
+# Use @ as delimiter for sed to avoid conflicts with any potential characters
+sed -i "s@revision=\"[^\"]*\"@revision=\"$SHA\"@" "$MANIFEST_FILE"
+
+echo "[INFO] Patched $MANIFEST_FILE successfully"
+
