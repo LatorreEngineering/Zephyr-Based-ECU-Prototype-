@@ -9,9 +9,9 @@
 
 set -euo pipefail
 
-# -----------------------------------------------------------------------------
+# ---------------------------------------------------------------------------
 # Configuration
-# -----------------------------------------------------------------------------
+# ---------------------------------------------------------------------------
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 WORKSPACE_DIR="${WORKSPACE_DIR:-${HOME}/zephyr-workspace}"
@@ -19,6 +19,7 @@ ZEPHYR_VERSION="${ZEPHYR_VERSION:-v3.7-branch}"
 WEST_MANIFEST_URL="${WEST_MANIFEST_URL:-}"
 WEST_MANIFEST_BRANCH="${WEST_MANIFEST_BRANCH:-$ZEPHYR_VERSION}"
 WEST_MANIFEST_FILE="${WEST_MANIFEST_FILE:-manifests/pinned_manifest.xml}"
+ZEPHYR_REPO_URL="${ZEPHYR_REPO_URL:-https://github.com/zephyrproject-rtos/zephyr.git}"
 
 # Color output
 RED='\033[0;31m'
@@ -26,21 +27,21 @@ GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 NC='\033[0m' # No Color
 
-# -----------------------------------------------------------------------------
+# ---------------------------------------------------------------------------
 # Logging Functions
-# -----------------------------------------------------------------------------
+# ---------------------------------------------------------------------------
 log_info()  { echo -e "${GREEN}[INFO]${NC} $*"; }
 log_warn()  { echo -e "${YELLOW}[WARN]${NC} $*"; }
 log_error() { echo -e "${RED}[ERROR]${NC} $*" >&2; }
 log_step()  { echo -e "\n==========================================\n$*\n=========================================="; }
 
-# -----------------------------------------------------------------------------
+# ---------------------------------------------------------------------------
 # Dependency Checks
-# -----------------------------------------------------------------------------
+# ---------------------------------------------------------------------------
 check_dependencies() {
     log_step "Checking Dependencies"
     local missing_deps=()
-    for cmd in python3 pip git cmake ninja; do
+    for cmd in python3 pip git cmake ninja sed; do
         if ! command -v "${cmd}" &>/dev/null; then
             missing_deps+=("${cmd}")
         fi
@@ -53,9 +54,41 @@ check_dependencies() {
     log_info "✅ All dependencies found"
 }
 
-# -----------------------------------------------------------------------------
+# ---------------------------------------------------------------------------
+# Fetch latest Zephyr SHA for the branch
+# ---------------------------------------------------------------------------
+fetch_zephyr_sha() {
+    log_step "Fetching latest Zephyr SHA for branch $ZEPHYR_VERSION"
+    local sha
+    sha=$(git ls-remote "$ZEPHYR_REPO_URL" "$ZEPHYR_VERSION" | awk '{print $1}')
+    if [ -z "$sha" ]; then
+        log_error "Failed to fetch SHA for Zephyr branch $ZEPHYR_VERSION"
+        exit 1
+    fi
+    log_info "Zephyr SHA: $sha"
+    echo "$sha"
+}
+
+# ---------------------------------------------------------------------------
+# Patch pinned manifest with SHA
+# ---------------------------------------------------------------------------
+patch_pinned_manifest() {
+    log_step "Patching Pinned Manifest with Zephyr SHA"
+    if [ ! -f "${PROJECT_ROOT}/${WEST_MANIFEST_FILE}" ]; then
+        log_error "Pinned manifest not found: ${PROJECT_ROOT}/${WEST_MANIFEST_FILE}"
+        exit 1
+    fi
+
+    local sha
+    sha=$(fetch_zephyr_sha)
+
+    sed -i "s|revision=\"[^\"]*\"|revision=\"$sha\"|" "${PROJECT_ROOT}/${WEST_MANIFEST_FILE}"
+    log_info "✅ Pinned manifest patched successfully"
+}
+
+# ---------------------------------------------------------------------------
 # Python Environment Setup
-# -----------------------------------------------------------------------------
+# ---------------------------------------------------------------------------
 setup_python_env() {
     log_step "Setting Up Python Environment"
     python3 -m pip install --upgrade pip --quiet
@@ -75,16 +108,11 @@ setup_python_env() {
     log_info "✅ Python environment ready"
 }
 
-# -----------------------------------------------------------------------------
+# ---------------------------------------------------------------------------
 # Workspace Initialization
-# -----------------------------------------------------------------------------
+# ---------------------------------------------------------------------------
 init_workspace() {
     log_step "Initializing Zephyr Workspace"
-    if [ -d "${WORKSPACE_DIR}/zephyr" ]; then
-        log_warn "Workspace already exists at ${WORKSPACE_DIR}"
-        log_info "Skipping initialization (use 'west update' to refresh)"
-        return
-    fi
     mkdir -p "${WORKSPACE_DIR}"
     cd "${WORKSPACE_DIR}"
 
@@ -92,26 +120,24 @@ init_workspace() {
     if [ -n "$WEST_MANIFEST_URL" ]; then
         log_info "Using private manifest repo"
         git config --global url."https://${GITHUB_TOKEN}:x-oauth-basic@github.com/".insteadOf "https://github.com/"
-        west init -m "$WEST_MANIFEST_URL" -b "$WEST_MANIFEST_BRANCH" -mf "$WEST_MANIFEST_FILE" .
+        west init -m "$WEST_MANIFEST_URL" -b "$WEST_MANIFEST_BRANCH" .
     else
         log_info "Using local manifest file"
-        west init -l -mf "$WEST_MANIFEST_FILE" .
+        west init -l "${WORKSPACE_DIR}"
     fi
+
+    # Configure west to use pinned manifest
+    west config manifest.file "${PROJECT_ROOT}/${WEST_MANIFEST_FILE}"
+
     log_info "✅ Workspace initialized"
 }
 
-# -----------------------------------------------------------------------------
+# ---------------------------------------------------------------------------
 # Update Dependencies with Pinned Manifest
-# -----------------------------------------------------------------------------
+# ---------------------------------------------------------------------------
 update_dependencies() {
     log_step "Updating Dependencies (Pinned Manifest)"
     cd "${WORKSPACE_DIR}"
-    if [ ! -f "$WEST_MANIFEST_FILE" ]; then
-        log_error "Pinned manifest not found: $WEST_MANIFEST_FILE"
-        exit 1
-    fi
-    log_info "Configuring pinned manifest..."
-    west config manifest.file "$WEST_MANIFEST_FILE"
     log_info "Fetching dependencies..."
     west update --narrow --fetch-opt=--depth=1
     log_info "Exporting Zephyr CMake package..."
@@ -119,9 +145,9 @@ update_dependencies() {
     log_info "✅ Dependencies updated"
 }
 
-# -----------------------------------------------------------------------------
+# ---------------------------------------------------------------------------
 # Verify Installation
-# -----------------------------------------------------------------------------
+# ---------------------------------------------------------------------------
 verify_installation() {
     log_step "Verifying Installation"
     export ZEPHYR_BASE="${WORKSPACE_DIR}/zephyr"
@@ -144,9 +170,9 @@ verify_installation() {
     log_info "✅ Installation verified"
 }
 
-# -----------------------------------------------------------------------------
+# ---------------------------------------------------------------------------
 # Generate Environment File
-# -----------------------------------------------------------------------------
+# ---------------------------------------------------------------------------
 generate_env_file() {
     log_step "Generating Environment Configuration"
     local env_file="${PROJECT_ROOT}/.env.ci"
@@ -167,9 +193,9 @@ EOF
     log_info "✅ Environment configured"
 }
 
-# -----------------------------------------------------------------------------
+# ---------------------------------------------------------------------------
 # Main Execution
-# -----------------------------------------------------------------------------
+# ---------------------------------------------------------------------------
 main() {
     log_step "Zephyr ECU CI Environment Setup"
     log_info "Project: ${PROJECT_ROOT}"
@@ -177,6 +203,7 @@ main() {
     log_info "Zephyr Version: ${ZEPHYR_VERSION}"
 
     check_dependencies
+    patch_pinned_manifest
     setup_python_env
     init_workspace
     update_dependencies
@@ -194,3 +221,4 @@ main() {
 
 # Run main function
 main "$@"
+
