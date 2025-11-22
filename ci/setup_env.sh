@@ -2,7 +2,7 @@
 # =============================================================================
 # Zephyr ECU Prototype - CI Environment Setup Script
 # =============================================================================
-# Purpose: Initialize Zephyr workspace with pinned dependencies
+# Purpose: Initialize Zephyr workspace with pinned dependencies (SHA)
 # Usage: ./ci/setup_env.sh
 # Requirements: Python 3.8+, pip, git
 # =============================================================================
@@ -16,6 +16,9 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 WORKSPACE_DIR="${WORKSPACE_DIR:-${HOME}/zephyr-workspace}"
 ZEPHYR_VERSION="${ZEPHYR_VERSION:-v3.7-branch}"
+WEST_MANIFEST_URL="${WEST_MANIFEST_URL:-}"
+WEST_MANIFEST_BRANCH="${WEST_MANIFEST_BRANCH:-$ZEPHYR_VERSION}"
+WEST_MANIFEST_FILE="${WEST_MANIFEST_FILE:-manifests/pinned_manifest.xml}"
 
 # Color output
 RED='\033[0;31m'
@@ -26,45 +29,27 @@ NC='\033[0m' # No Color
 # -----------------------------------------------------------------------------
 # Logging Functions
 # -----------------------------------------------------------------------------
-log_info() {
-    echo -e "${GREEN}[INFO]${NC} $*"
-}
-
-log_warn() {
-    echo -e "${YELLOW}[WARN]${NC} $*"
-}
-
-log_error() {
-    echo -e "${RED}[ERROR]${NC} $*" >&2
-}
-
-log_step() {
-    echo ""
-    echo "=========================================="
-    echo "$*"
-    echo "=========================================="
-}
+log_info()  { echo -e "${GREEN}[INFO]${NC} $*"; }
+log_warn()  { echo -e "${YELLOW}[WARN]${NC} $*"; }
+log_error() { echo -e "${RED}[ERROR]${NC} $*" >&2; }
+log_step()  { echo -e "\n==========================================\n$*\n=========================================="; }
 
 # -----------------------------------------------------------------------------
 # Dependency Checks
 # -----------------------------------------------------------------------------
 check_dependencies() {
     log_step "Checking Dependencies"
-    
     local missing_deps=()
-    
     for cmd in python3 pip git cmake ninja; do
-        if ! command -v "${cmd}" &> /dev/null; then
+        if ! command -v "${cmd}" &>/dev/null; then
             missing_deps+=("${cmd}")
         fi
     done
-    
     if [ ${#missing_deps[@]} -ne 0 ]; then
         log_error "Missing dependencies: ${missing_deps[*]}"
         log_error "Install them with: sudo apt-get install python3 python3-pip git cmake ninja-build"
         exit 1
     fi
-    
     log_info "✅ All dependencies found"
 }
 
@@ -73,37 +58,20 @@ check_dependencies() {
 # -----------------------------------------------------------------------------
 setup_python_env() {
     log_step "Setting Up Python Environment"
-    
-    # Upgrade pip
     python3 -m pip install --upgrade pip --quiet
-    
-    # Install west
-    if ! pip show west &> /dev/null; then
+    if ! pip show west &>/dev/null; then
         log_info "Installing west..."
         pip install west
     else
         log_info "West already installed, upgrading..."
         pip install --upgrade west
     fi
-    
-    # Verify west installation
-    if ! command -v west &> /dev/null; then
+    if ! command -v west &>/dev/null; then
         log_error "West installation failed"
         exit 1
     fi
-    
     log_info "West version: $(west --version)"
-    
-    # Install additional Python dependencies
-    log_info "Installing Python dependencies..."
-    pip install --quiet \
-        pyelftools \
-        cantools \
-        pyyaml \
-        intelhex \
-        pyserial \
-        pytest
-    
+    pip install --quiet pyelftools cantools pyyaml intelhex pyserial pytest
     log_info "✅ Python environment ready"
 }
 
@@ -112,22 +80,23 @@ setup_python_env() {
 # -----------------------------------------------------------------------------
 init_workspace() {
     log_step "Initializing Zephyr Workspace"
-    
-    # Check if workspace already exists
     if [ -d "${WORKSPACE_DIR}/zephyr" ]; then
         log_warn "Workspace already exists at ${WORKSPACE_DIR}"
-        log_info "Skipping initialization (use west update to refresh)"
-        return 0
+        log_info "Skipping initialization (use 'west update' to refresh)"
+        return
     fi
-    
-    # Create workspace directory
     mkdir -p "${WORKSPACE_DIR}"
     cd "${WORKSPACE_DIR}"
-    
-    # Initialize west workspace
+
     log_info "Initializing west workspace..."
-    west init -m https://github.com/LatorreEngineering/Zephyr-Based-ECU-Prototype- .
-    
+    if [ -n "$WEST_MANIFEST_URL" ]; then
+        log_info "Using private manifest repo"
+        git config --global url."https://${GITHUB_TOKEN}:x-oauth-basic@github.com/".insteadOf "https://github.com/"
+        west init -m "$WEST_MANIFEST_URL" -b "$WEST_MANIFEST_BRANCH" -mf "$WEST_MANIFEST_FILE" .
+    else
+        log_info "Using local manifest file"
+        west init -l -mf "$WEST_MANIFEST_FILE" .
+    fi
     log_info "✅ Workspace initialized"
 }
 
@@ -136,28 +105,17 @@ init_workspace() {
 # -----------------------------------------------------------------------------
 update_dependencies() {
     log_step "Updating Dependencies (Pinned Manifest)"
-    
     cd "${WORKSPACE_DIR}"
-    
-    # Configure manifest to use pinned version
-    log_info "Configuring pinned manifest..."
-    west config manifest.file manifests/pinned_manifest.xml
-    
-    # Verify pinned manifest exists
-    if [ ! -f "${WORKSPACE_DIR}/ecu-prototype/manifests/pinned_manifest.xml" ]; then
-        log_error "Pinned manifest not found!"
-        log_error "Expected: ${WORKSPACE_DIR}/ecu-prototype/manifests/pinned_manifest.xml"
+    if [ ! -f "$WEST_MANIFEST_FILE" ]; then
+        log_error "Pinned manifest not found: $WEST_MANIFEST_FILE"
         exit 1
     fi
-    
-    # Update all modules
-    log_info "Fetching dependencies (this may take a few minutes)..."
+    log_info "Configuring pinned manifest..."
+    west config manifest.file "$WEST_MANIFEST_FILE"
+    log_info "Fetching dependencies..."
     west update --narrow --fetch-opt=--depth=1
-    
-    # Export CMake package
     log_info "Exporting Zephyr CMake package..."
     west zephyr-export
-    
     log_info "✅ Dependencies updated"
 }
 
@@ -166,20 +124,13 @@ update_dependencies() {
 # -----------------------------------------------------------------------------
 verify_installation() {
     log_step "Verifying Installation"
-    
-    # Check ZEPHYR_BASE
     export ZEPHYR_BASE="${WORKSPACE_DIR}/zephyr"
-    
     if [ ! -f "${ZEPHYR_BASE}/VERSION" ]; then
         log_error "Zephyr installation incomplete"
         exit 1
     fi
-    
-    local zephyr_version
-    zephyr_version=$(cat "${ZEPHYR_BASE}/VERSION")
-    log_info "Zephyr version: ${zephyr_version}"
-    
-    # Verify key modules
+    log_info "Zephyr version: $(cat ${ZEPHYR_BASE}/VERSION)"
+
     local modules=("hal_nxp" "hal_cmsis" "mcuboot" "mbedtls")
     for module in "${modules[@]}"; do
         if [ -d "${WORKSPACE_DIR}/modules/hal/${module}" ] || \
@@ -190,7 +141,6 @@ verify_installation() {
             log_warn "⚠️  Module not found: ${module}"
         fi
     done
-    
     log_info "✅ Installation verified"
 }
 
@@ -199,9 +149,7 @@ verify_installation() {
 # -----------------------------------------------------------------------------
 generate_env_file() {
     log_step "Generating Environment Configuration"
-    
     local env_file="${PROJECT_ROOT}/.env.ci"
-    
     cat > "${env_file}" <<EOF
 # Zephyr ECU CI Environment Configuration
 # Generated: $(date -u +%Y-%m-%dT%H:%M:%SZ)
@@ -210,18 +158,12 @@ export ZEPHYR_BASE="${WORKSPACE_DIR}/zephyr"
 export ZEPHYR_SDK_INSTALL_DIR="${HOME}/zephyr-sdk-\${ZEPHYR_SDK_VERSION}"
 export ZEPHYR_TOOLCHAIN_VARIANT=zephyr
 export GNUARMEMB_TOOLCHAIN_PATH="\${ZEPHYR_SDK_INSTALL_DIR}/arm-zephyr-eabi"
-
-# Project paths
 export PROJECT_ROOT="${PROJECT_ROOT}"
 export WORKSPACE_DIR="${WORKSPACE_DIR}"
-
-# Build configuration
 export CMAKE_PREFIX_PATH="\${ZEPHYR_BASE}"
 EOF
-    
     log_info "Environment file created: ${env_file}"
     log_info "Source it with: source ${env_file}"
-    
     log_info "✅ Environment configured"
 }
 
@@ -233,14 +175,14 @@ main() {
     log_info "Project: ${PROJECT_ROOT}"
     log_info "Workspace: ${WORKSPACE_DIR}"
     log_info "Zephyr Version: ${ZEPHYR_VERSION}"
-    
+
     check_dependencies
     setup_python_env
     init_workspace
     update_dependencies
     verify_installation
     generate_env_file
-    
+
     log_step "✅ Setup Complete!"
     echo ""
     log_info "Next steps:"
