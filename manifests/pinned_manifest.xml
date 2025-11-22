@@ -1,39 +1,10 @@
-<?xml version="1.0" encoding="UTF-8"?>
-<!--
-  Local reference manifest for Halo.OS VBS Performance Harness
-  
-  NOTE: This is for documentation/reference only.
-  The CI uses the official manifest from: https://gitee.com/haloos/manifests.git
-  
-  This file tracks the baseline used for reproducible builds.
-  Update the revision field when you want to pin to a specific commit.
--->
+<?xml version="1.0"?>
 <manifest>
-  <remote name="gitee"
-          fetch="https://gitee.com"
-          review="https://gitee.com" />
-  
-  <default remote="gitee"
-           revision="refs/heads/master"
-           sync-j="4" />
-  
-  <!--
-    VBSPro: Vehicle Base System Pro
-    The core middleware for inter-domain messaging and resource virtualization
-    This is what we build and instrument for performance measurement
-  -->
-  <project name="haloos/vbs"
-           path="vbs"
-           remote="gitee"
-           revision="master">
-    <!-- VBSPro is the key component at vbs/vbspro/ -->
-  </project>
-  
-  <!--
-    Note: The actual sync is performed using vbs.xml from:
-    https://gitee.com/haloos/manifests.git
-    
-    This ensures we get the exact VBSPro dependencies without
-    unnecessary subsystems (VCOS, ADOS, etc.)
-  -->
+  <remote name="zephyr" fetch="https://github.com/zephyrproject-rtos/zephyr.git"/>
+  <default revision="abcdef1234567890abcdef1234567890abcdef12" remote="zephyr" sync-j="4"/>
+  <project name="zephyr" path="zephyr" revision="abcdef1234567890abcdef1234567890abcdef12"/>
+  <!-- Add your own project -->
+  <project name="LatorreEngineering/Zephyr-Based-ECU-Prototype"
+           path="Zephyr-Based-ECU-Prototype"
+           revision="your-application-commit-sha"/>
 </manifest>
