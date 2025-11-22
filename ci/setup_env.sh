@@ -2,7 +2,6 @@
 # =============================================================================
 # Zephyr ECU Prototype - CI Environment Setup Script
 # =============================================================================
-
 set -euo pipefail
 
 # ---------------------------------------------------------------------------
@@ -12,7 +11,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 WORKSPACE_DIR="${WORKSPACE_DIR:-${HOME}/zephyr-workspace}"
 ZEPHYR_VERSION="${ZEPHYR_VERSION:-v3.7-branch}"
-WEST_MANIFEST_URL="${WEST_MANIFEST_URL:-}"
+WEST_MANIFEST_URL="${WEST_MANIFEST_URL:-}"   # optional: private manifest
 WEST_MANIFEST_BRANCH="${WEST_MANIFEST_BRANCH:-$ZEPHYR_VERSION}"
 WEST_MANIFEST_FILE="${WEST_MANIFEST_FILE:-manifests/pinned_manifest.xml}"
 ZEPHYR_REPO_URL="${ZEPHYR_REPO_URL:-https://github.com/zephyrproject-rtos/zephyr.git}"
@@ -36,14 +35,14 @@ log_step()  { echo -e "\n==========================================\n$*\n=======
 # ---------------------------------------------------------------------------
 check_dependencies() {
     log_step "Checking Dependencies"
-    local missing_deps=()
+    local missing=()
     for cmd in python3 pip git cmake ninja sed; do
-        if ! command -v "${cmd}" &>/dev/null; then
-            missing_deps+=("${cmd}")
+        if ! command -v "$cmd" &>/dev/null; then
+            missing+=("$cmd")
         fi
     done
-    if [ ${#missing_deps[@]} -ne 0 ]; then
-        log_error "Missing dependencies: ${missing_deps[*]}"
+    if [ "${#missing[@]}" -ne 0 ]; then
+        log_error "Missing dependencies: ${missing[*]}"
         log_error "Install them with: sudo apt-get install python3 python3-pip git cmake ninja-build"
         exit 1
     fi
@@ -56,9 +55,9 @@ check_dependencies() {
 fetch_zephyr_sha() {
     log_step "Fetching latest Zephyr SHA for branch $ZEPHYR_VERSION"
     local sha
-    sha=$(git ls-remote "$ZEPHYR_REPO_URL" "$ZEPHYR_VERSION" | awk '{print $1}')
-    if [ -z "$sha" ]; then
-        log_error "Failed to fetch SHA for Zephyr branch $ZEPHYR_VERSION"
+    sha=$(git ls-remote "$ZEPHYR_REPO_URL" "$ZEPHYR_VERSION" | awk '{print $1}' | tr -d '\r\n')
+    if [[ ! "$sha" =~ ^[0-9a-f]{40}$ ]]; then
+        log_error "Invalid SHA fetched: '$sha'"
         exit 1
     fi
     log_info "Zephyr SHA: $sha"
@@ -66,7 +65,7 @@ fetch_zephyr_sha() {
 }
 
 # ---------------------------------------------------------------------------
-# Patch pinned manifest with SHA
+# Patch pinned manifest safely
 # ---------------------------------------------------------------------------
 patch_pinned_manifest() {
     log_step "Patching Pinned Manifest with Zephyr SHA"
@@ -76,11 +75,11 @@ patch_pinned_manifest() {
         exit 1
     fi
 
-    local sha safe_sha
+    local sha
     sha=$(fetch_zephyr_sha)
-    safe_sha=$(printf '%s\n' "$sha" | sed 's/[&/\]/\\&/g')
 
-    sed -i "s|revision=\"[^\"]*\"|revision=\"$safe_sha\"|" "$manifest"
+    # Use @ as delimiter to avoid conflicts; ensure no newlines
+    sed -i "s@revision=\"[^\"]*\"@revision=\"$sha\"@" "$manifest"
     log_info "✅ Pinned manifest patched successfully"
 }
 
@@ -111,10 +110,9 @@ setup_python_env() {
 # ---------------------------------------------------------------------------
 init_workspace() {
     log_step "Initializing Zephyr Workspace"
-    mkdir -p "${WORKSPACE_DIR}"
-    cd "${WORKSPACE_DIR}"
+    mkdir -p "$WORKSPACE_DIR"
+    cd "$WORKSPACE_DIR"
 
-    log_info "Initializing west workspace..."
     if [ -n "$WEST_MANIFEST_URL" ]; then
         log_info "Using private manifest repo"
         git config --global url."https://${GITHUB_TOKEN}:x-oauth-basic@github.com/".insteadOf "https://github.com/"
@@ -132,11 +130,9 @@ init_workspace() {
 # Update Dependencies
 # ---------------------------------------------------------------------------
 update_dependencies() {
-    log_step "Updating Dependencies (Pinned Manifest)"
-    cd "${WORKSPACE_DIR}"
-    log_info "Fetching dependencies..."
+    log_step "Updating Dependencies"
+    cd "$WORKSPACE_DIR"
     west update --narrow --fetch-opt=--depth=1
-    log_info "Exporting Zephyr CMake package..."
     west zephyr-export
     log_info "✅ Dependencies updated"
 }
@@ -151,7 +147,7 @@ verify_installation() {
         log_error "Zephyr installation incomplete"
         exit 1
     fi
-    log_info "Zephyr version: $(cat ${ZEPHYR_BASE}/VERSION)"
+    log_info "Zephyr version: $(cat "${ZEPHYR_BASE}/VERSION")"
 }
 
 # ---------------------------------------------------------------------------
@@ -172,19 +168,17 @@ export PROJECT_ROOT="${PROJECT_ROOT}"
 export WORKSPACE_DIR="${WORKSPACE_DIR}"
 export CMAKE_PREFIX_PATH="\${ZEPHYR_BASE}"
 EOF
-    log_info "Environment file created: $env_file"
-    log_info "Source it with: source $env_file"
-    log_info "✅ Environment configured"
+    log_info "✅ Environment configured: $env_file"
 }
 
 # ---------------------------------------------------------------------------
-# Main Execution
+# Main
 # ---------------------------------------------------------------------------
 main() {
     log_step "Zephyr ECU CI Environment Setup"
-    log_info "Project: ${PROJECT_ROOT}"
-    log_info "Workspace: ${WORKSPACE_DIR}"
-    log_info "Zephyr Version: ${ZEPHYR_VERSION}"
+    log_info "Project: $PROJECT_ROOT"
+    log_info "Workspace: $WORKSPACE_DIR"
+    log_info "Zephyr Version: $ZEPHYR_VERSION"
 
     check_dependencies
     patch_pinned_manifest
@@ -196,10 +190,10 @@ main() {
 
     log_step "✅ Setup Complete!"
     log_info "Next steps:"
-    log_info "  1. Source environment: source ${PROJECT_ROOT}/.env.ci"
+    log_info "  1. Source environment: source $PROJECT_ROOT/.env.ci"
     log_info "  2. Build firmware: ./ci/build_halo.sh"
     log_info "  3. Run tests: west build -b native_posix tests/test_state_machine"
 }
 
-# Run main
 main "$@"
+
