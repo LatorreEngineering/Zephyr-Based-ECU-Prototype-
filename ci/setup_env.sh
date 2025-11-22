@@ -50,6 +50,21 @@ check_dependencies() {
 }
 
 # ---------------------------------------------------------------------------
+# Patch pinned manifest
+# ---------------------------------------------------------------------------
+patch_pinned_manifest() {
+    log_step "Patching pinned manifest"
+    PATCH_SCRIPT="${SCRIPT_DIR}/patch_pinned_manifest.sh"
+
+    if [ ! -f "$PATCH_SCRIPT" ]; then
+        log_error "patch_pinned_manifest.sh not found at $PATCH_SCRIPT"
+        exit 1
+    fi
+
+    bash "$PATCH_SCRIPT"
+}
+
+# ---------------------------------------------------------------------------
 # Python Environment Setup
 # ---------------------------------------------------------------------------
 setup_python_env() {
@@ -62,7 +77,6 @@ setup_python_env() {
         log_info "West already installed, upgrading..."
         pip install --upgrade west
     fi
-    hash -r  # refresh shell cache
     if ! command -v west &>/dev/null; then
         log_error "West installation failed"
         exit 1
@@ -70,19 +84,6 @@ setup_python_env() {
     log_info "West version: $(west --version)"
     pip install --quiet pyelftools cantools pyyaml intelhex pyserial pytest
     log_info "✅ Python environment ready"
-}
-
-# ---------------------------------------------------------------------------
-# Patch pinned manifest
-# ---------------------------------------------------------------------------
-patch_pinned_manifest() {
-    log_step "Patching pinned manifest"
-    local patch_script="${PROJECT_ROOT}/ci/patch_pinned_manifest.sh"
-    if [ ! -f "$patch_script" ]; then
-        log_error "patch_pinned_manifest.sh not found at $patch_script"
-        exit 1
-    fi
-    "$patch_script"
 }
 
 # ---------------------------------------------------------------------------
@@ -95,11 +96,7 @@ init_workspace() {
 
     if [ -n "$WEST_MANIFEST_URL" ]; then
         log_info "Using private manifest repo"
-        if [ -z "${GITHUB_TOKEN:-}" ]; then
-            log_warn "GITHUB_TOKEN not set; private repo access may fail"
-        else
-            git config --global url."https://${GITHUB_TOKEN}:x-oauth-basic@github.com/".insteadOf "https://github.com/"
-        fi
+        git config --global url."https://${GITHUB_TOKEN}:x-oauth-basic@github.com/".insteadOf "https://github.com/"
         west init -m "$WEST_MANIFEST_URL" -b "$WEST_MANIFEST_BRANCH" .
     else
         log_info "Using local manifest file"
@@ -180,4 +177,3 @@ main() {
 }
 
 main "$@"
-
