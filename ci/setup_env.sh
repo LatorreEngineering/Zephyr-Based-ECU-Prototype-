@@ -50,40 +50,6 @@ check_dependencies() {
 }
 
 # ---------------------------------------------------------------------------
-# Fetch latest Zephyr SHA
-# ---------------------------------------------------------------------------
-fetch_zephyr_sha() {
-    log_step "Fetching latest Zephyr SHA for branch $ZEPHYR_VERSION"
-    local sha
-    sha=$(git ls-remote "$ZEPHYR_REPO_URL" "$ZEPHYR_VERSION" | awk '{print $1}' | tr -d '\r\n')
-    if [[ ! "$sha" =~ ^[0-9a-f]{40}$ ]]; then
-        log_error "Invalid SHA fetched: '$sha'"
-        exit 1
-    fi
-    log_info "Zephyr SHA: $sha"
-    echo "$sha"
-}
-
-# ---------------------------------------------------------------------------
-# Patch pinned manifest safely
-# ---------------------------------------------------------------------------
-patch_pinned_manifest() {
-    log_step "Patching Pinned Manifest with Zephyr SHA"
-    local manifest="${PROJECT_ROOT}/${WEST_MANIFEST_FILE}"
-    if [ ! -f "$manifest" ]; then
-        log_error "Pinned manifest not found: $manifest"
-        exit 1
-    fi
-
-    local sha
-    sha=$(fetch_zephyr_sha)
-
-    # Use @ as delimiter to avoid conflicts; ensure no newlines
-    sed -i "s@revision=\"[^\"]*\"@revision=\"$sha\"@" "$manifest"
-    log_info "✅ Pinned manifest patched successfully"
-}
-
-# ---------------------------------------------------------------------------
 # Python Environment Setup
 # ---------------------------------------------------------------------------
 setup_python_env() {
@@ -96,6 +62,7 @@ setup_python_env() {
         log_info "West already installed, upgrading..."
         pip install --upgrade west
     fi
+    hash -r  # refresh shell cache
     if ! command -v west &>/dev/null; then
         log_error "West installation failed"
         exit 1
@@ -103,6 +70,19 @@ setup_python_env() {
     log_info "West version: $(west --version)"
     pip install --quiet pyelftools cantools pyyaml intelhex pyserial pytest
     log_info "✅ Python environment ready"
+}
+
+# ---------------------------------------------------------------------------
+# Patch pinned manifest
+# ---------------------------------------------------------------------------
+patch_pinned_manifest() {
+    log_step "Patching pinned manifest"
+    local patch_script="${PROJECT_ROOT}/ci/patch_pinned_manifest.sh"
+    if [ ! -f "$patch_script" ]; then
+        log_error "patch_pinned_manifest.sh not found at $patch_script"
+        exit 1
+    fi
+    "$patch_script"
 }
 
 # ---------------------------------------------------------------------------
@@ -115,7 +95,11 @@ init_workspace() {
 
     if [ -n "$WEST_MANIFEST_URL" ]; then
         log_info "Using private manifest repo"
-        git config --global url."https://${GITHUB_TOKEN}:x-oauth-basic@github.com/".insteadOf "https://github.com/"
+        if [ -z "${GITHUB_TOKEN:-}" ]; then
+            log_warn "GITHUB_TOKEN not set; private repo access may fail"
+        else
+            git config --global url."https://${GITHUB_TOKEN}:x-oauth-basic@github.com/".insteadOf "https://github.com/"
+        fi
         west init -m "$WEST_MANIFEST_URL" -b "$WEST_MANIFEST_BRANCH" .
     else
         log_info "Using local manifest file"
