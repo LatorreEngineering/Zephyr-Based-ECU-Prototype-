@@ -1,22 +1,23 @@
-<manifest>
-  <project name="zephyr"
-           path="zephyr"
-           revision="1a2b3c4d5e6f7890deadbeefcafefeed12345678"
-           url="https://github.com/zephyrproject-rtos/zephyr.git">
-  </project>
+#!/bin/bash
+set -e
 
-  <remote name="zephyrproject"
-          url-base="https://github.com/zephyrproject-rtos"/>
+# Ensure zephyr_sha.txt exists
+if [ ! -f zephyr_sha.txt ]; then
+  echo "[ERROR] zephyr_sha.txt not found. Run the SHA fetch step first."
+  exit 1
+fi
 
-  <projects>
-    <project name="hal_nxp"
-             path="modules/hal/nxp"
-             remote="zephyrproject"
-             revision="main" />
+ZEHPYR_SHA=$(cat zephyr_sha.txt)
+MANIFEST_FILE="manifests/pinned_manifest.xml"
 
-    <project name="cmsis"
-             path="modules/hal/cmsis"
-             remote="zephyrproject"
-             revision="main" />
-  </projects>
-</manifest>
+if [ ! -f "$MANIFEST_FILE" ]; then
+  echo "[ERROR] $MANIFEST_FILE not found!"
+  exit 1
+fi
+
+echo "[INFO] Patching pinned_manifest.xml with Zephyr SHA: $ZEHPYR_SHA"
+
+# Replace any Zephyr revision in the manifest with the exact SHA
+sed -i "s|revision=\"[^\"]*\"|revision=\"$ZEHPYR_SHA\"|" "$MANIFEST_FILE"
+
+echo "[INFO] patched $MANIFEST_FILE successfully"
