@@ -2,10 +2,6 @@
 # =============================================================================
 # Zephyr ECU Prototype - CI Environment Setup Script
 # =============================================================================
-# Purpose: Initialize Zephyr workspace with pinned dependencies (SHA)
-# Usage: ./ci/setup_env.sh
-# Requirements: Python 3.8+, pip, git
-# =============================================================================
 
 set -euo pipefail
 
@@ -25,7 +21,7 @@ ZEPHYR_REPO_URL="${ZEPHYR_REPO_URL:-https://github.com/zephyrproject-rtos/zephyr
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
-NC='\033[0m' # No Color
+NC='\033[0m'
 
 # ---------------------------------------------------------------------------
 # Logging Functions
@@ -55,7 +51,7 @@ check_dependencies() {
 }
 
 # ---------------------------------------------------------------------------
-# Fetch latest Zephyr SHA for the branch
+# Fetch latest Zephyr SHA
 # ---------------------------------------------------------------------------
 fetch_zephyr_sha() {
     log_step "Fetching latest Zephyr SHA for branch $ZEPHYR_VERSION"
@@ -70,7 +66,7 @@ fetch_zephyr_sha() {
 }
 
 # ---------------------------------------------------------------------------
-# Patch pinned manifest with SHA safely
+# Patch pinned manifest with SHA
 # ---------------------------------------------------------------------------
 patch_pinned_manifest() {
     log_step "Patching Pinned Manifest with Zephyr SHA"
@@ -80,11 +76,8 @@ patch_pinned_manifest() {
         exit 1
     fi
 
-    local sha
+    local sha safe_sha
     sha=$(fetch_zephyr_sha)
-
-    # Escape potential special characters in SHA
-    local safe_sha
     safe_sha=$(printf '%s\n' "$sha" | sed 's/[&/\]/\\&/g')
 
     sed -i "s|revision=\"[^\"]*\"|revision=\"$safe_sha\"|" "$manifest"
@@ -131,13 +124,12 @@ init_workspace() {
         west init -l .
     fi
 
-    # Configure west to use pinned manifest
     west config manifest.file "${PROJECT_ROOT}/${WEST_MANIFEST_FILE}"
     log_info "✅ Workspace initialized"
 }
 
 # ---------------------------------------------------------------------------
-# Update Dependencies with Pinned Manifest
+# Update Dependencies
 # ---------------------------------------------------------------------------
 update_dependencies() {
     log_step "Updating Dependencies (Pinned Manifest)"
@@ -160,18 +152,6 @@ verify_installation() {
         exit 1
     fi
     log_info "Zephyr version: $(cat ${ZEPHYR_BASE}/VERSION)"
-
-    local modules=("hal_nxp" "hal_cmsis" "mcuboot" "mbedtls")
-    for module in "${modules[@]}"; do
-        if [ -d "${WORKSPACE_DIR}/modules/hal/${module}" ] || \
-           [ -d "${WORKSPACE_DIR}/bootloader/${module}" ] || \
-           [ -d "${WORKSPACE_DIR}/modules/crypto/${module}" ]; then
-            log_info "✅ Module found: ${module}"
-        else
-            log_warn "⚠️  Module not found: ${module}"
-        fi
-    done
-    log_info "✅ Installation verified"
 }
 
 # ---------------------------------------------------------------------------
@@ -215,4 +195,11 @@ main() {
     generate_env_file
 
     log_step "✅ Setup Complete!"
-    echo ""
+    log_info "Next steps:"
+    log_info "  1. Source environment: source ${PROJECT_ROOT}/.env.ci"
+    log_info "  2. Build firmware: ./ci/build_halo.sh"
+    log_info "  3. Run tests: west build -b native_posix tests/test_state_machine"
+}
+
+# Run main
+main "$@"
