@@ -1,10 +1,22 @@
-<?xml version="1.0"?>
 <manifest>
-  <remote name="zephyr" fetch="https://github.com/zephyrproject-rtos/zephyr.git"/>
-  <default revision="abcdef1234567890abcdef1234567890abcdef12" remote="zephyr" sync-j="4"/>
-  <project name="zephyr" path="zephyr" revision="abcdef1234567890abcdef1234567890abcdef12"/>
-  <!-- Add your own project -->
-  <project name="LatorreEngineering/Zephyr-Based-ECU-Prototype"
-           path="Zephyr-Based-ECU-Prototype"
-           revision="your-application-commit-sha"/>
+  <project name="zephyr"
+           path="zephyr"
+           revision="1a2b3c4d5e6f7890deadbeefcafefeed12345678"
+           url="https://github.com/zephyrproject-rtos/zephyr.git">
+  </project>
+
+  <remote name="zephyrproject"
+          url-base="https://github.com/zephyrproject-rtos"/>
+
+  <projects>
+    <project name="hal_nxp"
+             path="modules/hal/nxp"
+             remote="zephyrproject"
+             revision="main" />
+
+    <project name="cmsis"
+             path="modules/hal/cmsis"
+             remote="zephyrproject"
+             revision="main" />
+  </projects>
 </manifest>
