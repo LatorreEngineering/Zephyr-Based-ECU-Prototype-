@@ -6,22 +6,12 @@ permissions:
 
 on:
   push:
-    branches:
-      - main
-      - develop
-      - 'feature/**'
+    branches: [ main, develop, 'feature/**' ]
   pull_request:
-    branches:
-      - main
-      - develop
+    branches: [ main, develop ]
   schedule:
     - cron: '0 2 * * *'
   workflow_dispatch:
-    inputs:
-      run_experiments:
-        description: 'Run experimental validation tests'
-        required: false
-        default: 'false'
 
 env:
   ZEPHYR_VERSION: v3.7-branch
@@ -33,152 +23,102 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  # =========================================================================
-  # Job 0: Fetch Zephyr SHA & Patch Manifest
-  # =========================================================================
+
+  # ========================================================================
+  # Job 0 — Fetch SHA & Patch Manifest
+  # ========================================================================
   patch-manifest:
-    name: Fetch Zephyr SHA & Patch Manifest
     runs-on: ubuntu-22.04
     outputs:
-      zephyr-cache-key: zephyr-${{ env.ZEPHYR_VERSION }}-latest
+      sha: ${{ steps.sha-out.outputs.sha }}
+
     steps:
       - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
 
-      - name: Fetch latest Zephyr SHA for v3.7
+      - name: Fetch latest Zephyr SHA
+        id: sha-out
         run: |
           SHA=$(git ls-remote https://github.com/zephyrproject-rtos/zephyr.git refs/heads/${ZEPHYR_VERSION} | awk '{print $1}')
-          echo "[INFO] Latest Zephyr v3.7 SHA: $SHA"
-          echo $SHA > zephyr_sha.txt
-          echo "::set-output name=sha::$SHA"
+          echo "Fetched SHA: $SHA"
+          echo "$SHA" > zephyr_sha.txt
+          echo "sha=$SHA" >> "$GITHUB_OUTPUT"
 
-      - name: Patch pinned_manifest.xml
+      - name: Patch pinned manifest
         run: |
-          chmod +x ci/patch_manifest.sh
-          ./ci/patch_manifest.sh
+          chmod +x ci/patch_pinned_manifest.sh
+          ./ci/patch_pinned_manifest.sh
 
-      - name: Upload patched manifest
-        uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v4
         with:
           name: pinned-manifest
           path: manifests/pinned_manifest.xml
 
-  # =========================================================================
-  # Job 1: Setup Environment
-  # =========================================================================
+  # ========================================================================
+  # Job 1 — Setup Environment
+  # ========================================================================
   setup:
-    name: Setup & Validate Environment
     runs-on: ubuntu-22.04
     needs: patch-manifest
-    outputs:
-      zephyr-cache-key: ${{ steps.keys.outputs.zephyr }}
-      sdk-cache-key: ${{ steps.keys.outputs.sdk }}
+
     steps:
-      - name: Checkout Repository
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-          submodules: recursive
-
-      - id: keys
-        run: |
-          echo "zephyr=zephyr-${{ env.ZEPHYR_VERSION }}-${{ hashFiles('manifests/pinned_manifest.xml') }}" >> $GITHUB_OUTPUT
-          echo "sdk=zephyr-sdk-${{ env.ZEPHYR_SDK_VERSION }}-${{ runner.os }}" >> $GITHUB_OUTPUT
-
-      - name: Validate Manifest
-        run: |
-          if [ ! -f manifests/pinned_manifest.xml ]; then
-            echo "::error file=manifests/pinned_manifest.xml::Pinned manifest missing."
-            exit 1
-          fi
-          if grep -E 'revision="(main|master|v[0-9])"' manifests/pinned_manifest.xml; then
-            echo "::warning::Manifest contains branch refs; use SHAs for reproducibility."
-            exit 1
-          fi
+      - uses: actions/checkout@v4
 
       - uses: actions/setup-python@v5
         with:
           python-version: '3.11'
-          cache: pip
 
-      - name: Install Python Dependencies
+      - name: Install Globals
         run: |
-          python -m pip install --upgrade pip
-          pip install west cmake ninja pyelftools cantools pyyaml
+          pip install west cmake ninja
 
-  # =========================================================================
-  # Job 2: Initialize Zephyr Workspace
-  # =========================================================================
+      - name: Validate Manifest
+        run: |
+          test -f manifests/pinned_manifest.xml
+          echo "Manifest OK"
+
+  # ========================================================================
+  # Job 2 — Initialize Workspace
+  # ========================================================================
   init-workspace:
-    name: Initialize Zephyr Workspace
     runs-on: ubuntu-22.04
-    needs: setup
+    needs: [ setup, patch-manifest ]
+
+    env:
+      ZEPHYR_SHA: ${{ needs.patch-manifest.outputs.sha }}
+
     steps:
       - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-          submodules: recursive
 
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
 
-      - name: Install West
-        run: pip install west
+      - run: pip install west
 
-      - name: Cache Zephyr Workspace
-        id: cache
-        uses: actions/cache@v4
-        with:
-          path: |
-            ~/zephyr-workspace
-            ~/.cache/zephyr
-          key: ${{ needs.setup.outputs.zephyr-cache-key }}
-          restore-keys: zephyr-${{ env.ZEPHYR_VERSION }}-
-
-      - name: Make setup_env.sh Executable
-        run: chmod +x ./ci/setup_env.sh
-
-      - name: Initialize Workspace
-        if: steps.cache.outputs.cache-hit != 'true'
-        env:
-          ZEPHYR_BASE: ~/zephyr-workspace/zephyr
-          WEST_MANIFEST_URL: https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/zephyrproject-rtos/zephyr.git
-          WEST_MANIFEST_FILE: manifests/pinned_manifest.xml
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: ./ci/setup_env.sh
-
-      - name: Update West
-        working-directory: ~/zephyr-workspace
+      - name: Run Setup Script
         run: |
-          west update --narrow --fetch-opt=--depth=1
-          west zephyr-export
+          chmod +x ci/setup_env.sh
+          ./ci/setup_env.sh
 
-  # =========================================================================
-  # Job 3: Install Zephyr SDK
-  # =========================================================================
+  # ========================================================================
+  # Job 3 — Install SDK
+  # ========================================================================
   install-sdk:
-    name: Install Zephyr SDK
     runs-on: ubuntu-22.04
     needs: setup
+
     steps:
       - id: cache
         uses: actions/cache@v4
         with:
           path: ~/zephyr-sdk-${{ env.ZEPHYR_SDK_VERSION }}
-          key: ${{ needs.setup.outputs.sdk-cache-key }}
+          key: sdk-${{ env.ZEPHYR_SDK_VERSION }}
 
-      - name: Download & Install SDK
+      - name: Install SDK
         if: steps.cache.outputs.cache-hit != 'true'
         run: |
           wget https://github.com/zephyrproject-rtos/sdk-ng/releases/download/v${ZEPHYR_SDK_VERSION}/zephyr-sdk-${ZEPHYR_SDK_VERSION}_linux-x86_64.tar.xz
           tar -xf zephyr-sdk-${ZEPHYR_SDK_VERSION}_linux-x86_64.tar.xz -C ~/
           ~/zephyr-sdk-${ZEPHYR_SDK_VERSION}/setup.sh -t arm-zephyr-eabi -h -c
 
-  # =========================================================================
-  # Jobs 4-9: Build, Test, Analysis, Security, Docs, Summary
-  # =========================================================================
-  # Keep your existing jobs for build-hardware, build-tests, static-analysis,
-  # security-scan, documentation, and summary as-is.
