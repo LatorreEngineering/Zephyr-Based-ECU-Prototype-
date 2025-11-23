@@ -1,0 +1,11 @@
+manifest:
+  version: 0.12
+
+  projects:
+    - name: zephyr
+      url: https://github.com/zephyrproject-rtos/zephyr.git
+      revision: v3.7-branch
+      path: zephyr
+
+  self:
+    path: .
