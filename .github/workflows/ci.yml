@@ -14,8 +14,7 @@ jobs:
       zephyr_sha: ${{ steps.resolve_sha.outputs.zephyr_sha }}
 
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
@@ -34,41 +33,21 @@ jobs:
           python3 -m pip install --upgrade pip
           pip install west pyelftools cantools pyyaml intelhex pyserial pytest lxml
 
-      - name: Extract Zephyr revision (branch or SHA)
+      - name: Extract Zephyr revision
         id: read_revision
         run: |
-          echo "[INFO] Extracting revision from pinned_manifest.xml"
-          if [[ ! -f manifests/pinned_manifest.xml ]]; then
-            echo "[ERROR] manifests/pinned_manifest.xml not found!"
-            ls -l manifests || true
-            exit 1
-          fi
           REV=$(xmllint --xpath "string(/manifest/project[@name='zephyr']/@revision)" manifests/pinned_manifest.xml)
-          if [[ -z "$REV" ]]; then
-            echo "[ERROR] Failed to extract revision from pinned_manifest.xml"
-            exit 1
-          fi
           echo "revision_raw=$REV" >> $GITHUB_OUTPUT
-          echo "[INFO] Extracted revision: $REV"
 
-      - name: Resolve revision to actual SHA
+      - name: Resolve to SHA
         id: resolve_sha
         run: |
-          REV='${{ steps.read_revision.outputs.revision_raw }}'
-          echo "[INFO] Resolving revision: $REV"
-          # Already a SHA?
+          REV="${{ steps.read_revision.outputs.revision_raw }}"
           if [[ "$REV" =~ ^[0-9a-f]{40}$ ]]; then
-            echo "[INFO] Revision is already a SHA"
             echo "zephyr_sha=$REV" >> $GITHUB_OUTPUT
             exit 0
           fi
-          # Resolve branch/tag to SHA
           SHA=$(git ls-remote https://github.com/zephyrproject-rtos/zephyr.git "$REV" | awk '{print $1}')
-          if [[ -z "$SHA" ]]; then
-            echo "[ERROR] Failed to resolve '$REV' to a commit SHA"
-            exit 1
-          fi
-          echo "[INFO] Resolved $REV → $SHA"
           echo "zephyr_sha=$SHA" >> $GITHUB_OUTPUT
 
   patch-manifest:
@@ -76,17 +55,14 @@ jobs:
     needs: setup
     outputs:
       sha: ${{ needs.setup.outputs.zephyr_sha }}
-
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-
-      - name: Patch pinned_manifest.xml with SHA
+      - name: Patch pinned manifest
         env:
           ZEPHYR_SHA: ${{ needs.setup.outputs.zephyr_sha }}
         run: |
-          echo "[INFO] Applying SHA: $ZEPHYR_SHA"
           chmod +x manifests/patch_pinned_manifest.sh
           ./manifests/patch_pinned_manifest.sh
 
@@ -96,13 +72,11 @@ jobs:
     env:
       WORKSPACE_DIR: ${{ github.workspace }}/zephyr-workspace
       ZEPHYR_SHA: ${{ needs.setup.outputs.zephyr_sha }}
-
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-
-      - name: Initialize Zephyr Workspace
+      - name: Initialize Zephyr workspace
         run: |
           chmod +x ci/setup_env.sh
           WORKSPACE_DIR="${WORKSPACE_DIR}" ./ci/setup_env.sh
@@ -112,17 +86,14 @@ jobs:
     needs: init-workspace
     env:
       WORKSPACE_DIR: ${{ github.workspace }}/zephyr-workspace
-
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-
       - name: Build ECU for FRDM-K64F
         run: |
           source .env.ci
           ./ci/build_halo.sh
-
       - name: Build Native Posix Tests
         run: |
           source .env.ci
