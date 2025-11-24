@@ -20,23 +20,23 @@ jobs:
       - name: Install OS packages
         run: |
           sudo apt-get update
-          sudo apt-get install -y libxml2-utils cmake ninja-build git python3-pip
+          sudo apt-get install -y cmake ninja-build git python3-pip
 
-      - name: Setup Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.11"
-
-      - name: Install Python packages
+      - name: Setup Python + West
         run: |
           python3 -m pip install --upgrade pip
-          pip install west pyelftools cantools pyyaml intelhex pyserial pytest
+          pip install west lxml pyelftools cantools pyyaml intelhex pyserial pytest
 
       - name: Extract Zephyr SHA from pinned_manifest.xml
         id: extract
         run: |
-          SHA=$(sed -n 's/.*<project name="zephyr" revision="\([^"]*\)".*/\1/p' manifests/pinned_manifest.xml)
-          if [ -z "$SHA" ]; then
+          if [[ ! -f manifests/pinned_manifest.xml ]]; then
+            echo "[ERROR] Manifest file not found"
+            exit 1
+          fi
+          # robust extraction
+          SHA=$(grep 'project name="zephyr"' manifests/pinned_manifest.xml | sed -E 's/.*revision="([^"]+)".*/\1/')
+          if [[ -z "$SHA" ]]; then
             echo "[ERROR] Could not extract Zephyr SHA from pinned_manifest.xml"
             exit 1
           fi
@@ -65,7 +65,7 @@ jobs:
     needs: [setup, patch-manifest]
 
     env:
-      WORKSPACE_DIR: ${{ github.workspace }}
+      WORKSPACE_DIR: ${{ github.workspace }}/zephyr-workspace
       ZEPHYR_SHA: ${{ needs.setup.outputs.zephyr_sha }}
 
     steps:
@@ -81,7 +81,7 @@ jobs:
     needs: init-workspace
 
     env:
-      WORKSPACE_DIR: ${{ github.workspace }}
+      WORKSPACE_DIR: ${{ github.workspace }}/zephyr-workspace
 
     steps:
       - uses: actions/checkout@v4
