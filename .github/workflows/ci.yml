@@ -1,3 +1,12 @@
+name: Zephyr ECU CI/CD Pipeline
+
+on:
+  push:
+    branches: [main, develop, 'feature/**']
+  pull_request:
+    branches: [main, develop]
+  workflow_dispatch:
+
 jobs:
   setup:
     runs-on: ubuntu-22.04
@@ -45,3 +54,27 @@ jobs:
         env:
           ZEPHYR_SHA: ${{ needs.setup.outputs.zephyr_sha }}
         run: chmod +x manifests/patch_pinned_manifest.sh && ./manifests/patch_pinned_manifest.sh
+
+  init-workspace:
+    runs-on: ubuntu-22.04
+    needs: [setup, patch-manifest]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Initialize Zephyr workspace
+        run: chmod +x ci/setup_env.sh && ./ci/setup_env.sh
+
+  build:
+    runs-on: ubuntu-22.04
+    needs: init-workspace
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build ECU for FRDM-K64F
+        run: |
+          source .env.ci
+          ./ci/build_halo.sh
+      - name: Build Native Posix Tests
+        run: |
+          source .env.ci
+          west build -b native_posix tests/test_state_machine
+          west build -b native_posix tests/test_isotp
+          west build -b native_posix tests/test_lin
