@@ -10,7 +10,6 @@ on:
 jobs:
   setup:
     runs-on: ubuntu-22.04
-
     outputs:
       zephyr_sha: ${{ steps.resolve_sha.outputs.zephyr_sha }}
 
@@ -35,57 +34,46 @@ jobs:
           python3 -m pip install --upgrade pip
           pip install west pyelftools cantools pyyaml intelhex pyserial pytest lxml
 
-      - name: Extract Zephyr revision (branch or SHA) from pinned_manifest.xml
+      - name: Extract Zephyr revision (branch or SHA)
         id: read_revision
         run: |
           echo "[INFO] Extracting revision from pinned_manifest.xml"
-
           if [[ ! -f manifests/pinned_manifest.xml ]]; then
             echo "[ERROR] manifests/pinned_manifest.xml not found!"
             ls -l manifests || true
             exit 1
           fi
-
-          REV=$(xmllint --xpath "string(/manifest/project[@name='zephyr']/@revision)" manifests/pinned_manifest.xml || true)
-
+          REV=$(xmllint --xpath "string(/manifest/project[@name='zephyr']/@revision)" manifests/pinned_manifest.xml)
           if [[ -z "$REV" ]]; then
-            echo "[ERROR] Failed to extract revision attribute from pinned_manifest.xml"
+            echo "[ERROR] Failed to extract revision from pinned_manifest.xml"
             exit 1
           fi
-
-          echo "[INFO] Extracted revision: $REV"
           echo "revision_raw=$REV" >> $GITHUB_OUTPUT
+          echo "[INFO] Extracted revision: $REV"
 
       - name: Resolve revision to actual SHA
         id: resolve_sha
         run: |
-          # Avoid YAML interpolation issues using single quotes
           REV='${{ steps.read_revision.outputs.revision_raw }}'
           echo "[INFO] Resolving revision: $REV"
-
-          # If already a SHA, accept directly
+          # Already a SHA?
           if [[ "$REV" =~ ^[0-9a-f]{40}$ ]]; then
-              echo "[INFO] Revision is already a SHA"
-              echo "zephyr_sha=$REV" >> $GITHUB_OUTPUT
-              exit 0
+            echo "[INFO] Revision is already a SHA"
+            echo "zephyr_sha=$REV" >> $GITHUB_OUTPUT
+            exit 0
           fi
-
-          echo "[INFO] Revision is NOT SHA → resolving branch/tag to commit SHA"
-
+          # Resolve branch/tag to SHA
           SHA=$(git ls-remote https://github.com/zephyrproject-rtos/zephyr.git "$REV" | awk '{print $1}')
-
           if [[ -z "$SHA" ]]; then
             echo "[ERROR] Failed to resolve '$REV' to a commit SHA"
             exit 1
           fi
-
           echo "[INFO] Resolved $REV → $SHA"
           echo "zephyr_sha=$SHA" >> $GITHUB_OUTPUT
 
   patch-manifest:
     runs-on: ubuntu-22.04
     needs: setup
-
     outputs:
       sha: ${{ needs.setup.outputs.zephyr_sha }}
 
@@ -94,7 +82,7 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Patch pinned_manifest.xml with resolved Zephyr SHA
+      - name: Patch pinned_manifest.xml with SHA
         env:
           ZEPHYR_SHA: ${{ needs.setup.outputs.zephyr_sha }}
         run: |
@@ -105,7 +93,6 @@ jobs:
   init-workspace:
     runs-on: ubuntu-22.04
     needs: [setup, patch-manifest]
-
     env:
       WORKSPACE_DIR: ${{ github.workspace }}/zephyr-workspace
       ZEPHYR_SHA: ${{ needs.setup.outputs.zephyr_sha }}
@@ -123,7 +110,6 @@ jobs:
   build:
     runs-on: ubuntu-22.04
     needs: init-workspace
-
     env:
       WORKSPACE_DIR: ${{ github.workspace }}/zephyr-workspace
 
