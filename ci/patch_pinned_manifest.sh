@@ -3,9 +3,7 @@ set -euo pipefail
 
 MANIFEST_FILE="manifests/pinned_manifest.xml"
 
-# -------------------------------------------------------------------
-# Get SHA from environment variable or file
-# -------------------------------------------------------------------
+# Obtain SHA from env or file
 if [[ -n "${ZEPHYR_SHA:-}" ]]; then
     SHA="$ZEPHYR_SHA"
 elif [[ -f zephyr_sha.txt ]]; then
@@ -15,32 +13,24 @@ else
     exit 1
 fi
 
-# Remove whitespace
 SHA=$(echo "$SHA" | tr -d '[:space:]')
 if [[ -z "$SHA" ]]; then
-    echo "[ERROR] SHA is empty after trimming"
+    echo "[ERROR] SHA is empty"
     exit 1
 fi
 
-# -------------------------------------------------------------------
-# Verify manifest exists
-# -------------------------------------------------------------------
 if [[ ! -f "$MANIFEST_FILE" ]]; then
     echo "[ERROR] Manifest file not found: $MANIFEST_FILE"
     exit 1
 fi
 
-echo "[INFO] Patching Zephyr revision in: $MANIFEST_FILE"
-echo "[INFO] Using SHA: $SHA"
+echo "[INFO] Patching Zephyr revision in $MANIFEST_FILE with SHA $SHA"
 
-# -------------------------------------------------------------------
-# Escape characters in SHA for sed
-# -------------------------------------------------------------------
-ESCAPED_SHA=$(printf '%s' "$SHA" | sed -e 's/[\/&]/\\&/g')
+# Escape for sed
+ESC_SHA=$(printf '%s' "$SHA" | sed 's/[\/&]/\\&/g')
 
-# -------------------------------------------------------------------
-# Patch manifest safely
-# -------------------------------------------------------------------
-sed -i "s|revision=\"[^\"]*\"|revision=\"$ESCAPED_SHA\"|" "$MANIFEST_FILE"
+# Patch revision
+sed -i "s|revision=\"[^\"]*\"|revision=\"$ESC_SHA\"|" "$MANIFEST_FILE"
 
 echo "[INFO] pinned_manifest.xml patched successfully"
+
