@@ -2,7 +2,10 @@ name: Zephyr ECU CI/CD Pipeline
 
 on:
   push:
+    branches: [main, develop, 'feature/**']
   pull_request:
+    branches: [main, develop]
+  workflow_dispatch:
 
 jobs:
   setup:
@@ -14,18 +17,21 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install Python
+      - name: Install OS packages
+        run: sudo apt-get update && sudo apt-get install -y libxml2-utils cmake ninja-build
+
+      - name: Setup Python
         uses: actions/setup-python@v5
         with:
           python-version: "3.11"
 
-      - name: Install west
-        run: pip install west lxml
+      - name: Install Python packages
+        run: pip install --upgrade pip west pyelftools cantools pyyaml intelhex pyserial pytest
 
       - name: Extract Zephyr SHA from pinned_manifest.xml
         id: extract
         run: |
-          SHA=$(xmllint --xpath "string(/manifest/project[@name='zephyr']/@revision)" manifests/pinned_manifest.xml)
+          SHA=$(grep -oP '(?<=project name="zephyr" revision=")[^"]+' manifests/pinned_manifest.xml)
           echo "zephyr_sha=$SHA" >> "$GITHUB_OUTPUT"
           echo "Found Zephyr SHA: $SHA"
 
@@ -39,19 +45,16 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Make patch script executable
-        run: chmod +x manifests/patch_pinned_manifest.sh
-
       - name: Patch pinned manifest
         env:
           ZEPHYR_SHA: ${{ needs.setup.outputs.zephyr_sha }}
         run: |
-          cd manifests
-          ./patch_pinned_manifest.sh
+          chmod +x manifests/patch_pinned_manifest.sh
+          ./manifests/patch_pinned_manifest.sh
 
   init-workspace:
     runs-on: ubuntu-22.04
-    needs: [ setup, patch-manifest ]
+    needs: [setup, patch-manifest]
 
     env:
       WORKSPACE_DIR: ${{ github.workspace }}
@@ -60,19 +63,10 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install Python + West
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.11"
-
-      - run: pip install west
-
       - name: Initialize West Workspace
         run: |
-          echo "WORKSPACE_DIR=$WORKSPACE_DIR"
-          echo "Project root = $(pwd)"
           chmod +x ci/setup_env.sh
-          ./ci/setup_env.sh
+          WORKSPACE_DIR="${WORKSPACE_DIR}" ./ci/setup_env.sh
 
   build:
     runs-on: ubuntu-22.04
@@ -95,4 +89,3 @@ jobs:
           west build -b native_posix tests/test_state_machine
           west build -b native_posix tests/test_isotp
           west build -b native_posix tests/test_lin
-
