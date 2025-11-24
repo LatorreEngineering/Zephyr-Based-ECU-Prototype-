@@ -4,8 +4,6 @@ set -euo pipefail
 # -----------------------------------------------------------------------------
 # Environment-safe path setup
 # -----------------------------------------------------------------------------
-
-# Running in CI → GitHub defines $GITHUB_WORKSPACE
 if [[ -n "${GITHUB_WORKSPACE:-}" ]]; then
     WORKSPACE_DIR="${WORKSPACE_DIR:-$GITHUB_WORKSPACE/zephyr-workspace}"
 else
@@ -15,12 +13,11 @@ fi
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 
-# Manifest patch script location
 PATCH_SCRIPT="${PROJECT_ROOT}/manifests/patch_pinned_manifest.sh"
 PINNED_MANIFEST="${PROJECT_ROOT}/manifests/pinned_manifest.xml"
 
 # -----------------------------------------------------------------------------
-# Colors
+# Colors for logging
 # -----------------------------------------------------------------------------
 GREEN='\033[0;32m'
 RED='\033[0;31m'
@@ -37,7 +34,7 @@ step() { echo -e "\n==========================================\n$*\n============
 # -----------------------------------------------------------------------------
 check_dependencies() {
     step "Checking Dependencies"
-    for cmd in python3 pip git cmake ninja sed xmllint; do
+    for cmd in python3 pip git cmake ninja sed; do
         if ! command -v "$cmd" >/dev/null; then
             err "Missing dependency: $cmd"
             exit 1
@@ -47,7 +44,7 @@ check_dependencies() {
 }
 
 # -----------------------------------------------------------------------------
-# Patch pinned manifest (XML → enforce SHA)
+# Patch pinned manifest (enforce Zephyr SHA)
 # -----------------------------------------------------------------------------
 patch_pinned_manifest() {
     step "Patching pinned manifest"
@@ -63,16 +60,18 @@ patch_pinned_manifest() {
 
     chmod +x "$PATCH_SCRIPT"
     "$PATCH_SCRIPT"
+
+    log "Pinned manifest patched successfully"
 }
 
 # -----------------------------------------------------------------------------
-# Install Python + West
+# Python + West setup
 # -----------------------------------------------------------------------------
 setup_python_env() {
     step "Installing Python dependencies"
 
     python3 -m pip install --upgrade pip
-    pip install --upgrade west lxml
+    pip install --upgrade west
     pip install pyelftools cantools pyyaml intelhex pyserial pytest
 
     log "Python environment ready"
@@ -82,22 +81,23 @@ setup_python_env() {
 # Initialize Zephyr Workspace
 # -----------------------------------------------------------------------------
 init_workspace() {
-    step "Initializing West Workspace"
+    step "Initializing West workspace"
 
     mkdir -p "$WORKSPACE_DIR"
     cd "$WORKSPACE_DIR"
 
-    log "Running: west init -l $PROJECT_ROOT"
-    west init -l "$PROJECT_ROOT"
+    if [[ -f .west/config ]]; then
+        warn "Workspace already initialized, skipping west init"
+    else
+        log "Running: west init -l $PROJECT_ROOT"
+        west init -l "$PROJECT_ROOT"
+    fi
 
-    # Ensure west.yml is used normally
-    log "Using west.yml (pinned manifest only affects Zephyr revision)"
-
-    log "Workspace initialized"
+    log "Workspace ready at $WORKSPACE_DIR"
 }
 
 # -----------------------------------------------------------------------------
-# West Update
+# Update Zephyr modules
 # -----------------------------------------------------------------------------
 update_dependencies() {
     step "Updating Zephyr modules"
@@ -106,7 +106,7 @@ update_dependencies() {
     west update --narrow --fetch-opt=--depth=1
     west zephyr-export
 
-    log "Modules updated"
+    log "Zephyr modules updated"
 }
 
 # -----------------------------------------------------------------------------
@@ -121,7 +121,7 @@ verify_installation() {
         exit 1
     fi
 
-    log "Zephyr is installed correctly"
+    log "Zephyr installation verified"
 }
 
 # -----------------------------------------------------------------------------
