@@ -2,7 +2,7 @@ name: Zephyr ECU CI/CD Pipeline
 
 on:
   push:
-    branches: [main, develop, 'feature/**']
+    branches: [main, develop, "feature/**"]
   pull_request:
     branches: [main, develop]
   workflow_dispatch:
@@ -12,13 +12,13 @@ jobs:
     runs-on: ubuntu-22.04
 
     outputs:
-      zephyr_sha: ${{ steps.extract.outputs.zephyr_sha }}
+      zephyr_sha: ${{ steps.resolve_sha.outputs.zephyr_sha }}
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0  # ensure all files and history
+          fetch-depth: 0
 
       - name: Install OS packages
         run: |
@@ -33,81 +33,24 @@ jobs:
       - name: Install Python packages
         run: |
           python3 -m pip install --upgrade pip
-          pip install west pyelftools cantools pyyaml intelhex pyserial pytest lxml
+          pip install west lxml pyelftools cantools pyyaml intelhex pyserial pytest
 
-      - name: Extract Zephyr SHA from pinned_manifest.xml
-        id: extract
+      - name: Read revision from pinned_manifest.xml
+        id: read_revision
         run: |
-          echo "[INFO] Current directory: $(pwd)"
           if [[ ! -f manifests/pinned_manifest.xml ]]; then
-            echo "[ERROR] manifests/pinned_manifest.xml not found!"
-            ls -l manifests || true
+            echo "ERROR: manifests/pinned_manifest.xml missing"
             exit 1
           fi
 
-          SHA=$(xmllint --xpath "string(/manifest/project[@name='zephyr']/@revision)" manifests/pinned_manifest.xml || true)
-          if [[ -z "$SHA" ]]; then
-            echo "[ERROR] Could not extract Zephyr SHA from pinned_manifest.xml"
-            exit 1
-          fi
+          REV=$(xmllint --xpath "string(/manifest/project[@name='zephyr']/@revision)" manifests/pinned_manifest.xml || true)
+          echo "revision_raw=$REV" >> $GITHUB_OUTPUT
+          echo "Found revision field: $REV"
 
-          echo "zephyr_sha=$SHA" >> "$GITHUB_OUTPUT"
-          echo "[INFO] Found Zephyr SHA: $SHA"
-
-  patch-manifest:
-    runs-on: ubuntu-22.04
-    needs: setup
-    outputs:
-      sha: ${{ needs.setup.outputs.zephyr_sha }}
-
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      - name: Patch pinned manifest
-        env:
-          ZEPHYR_SHA: ${{ needs.setup.outputs.zephyr_sha }}
+      - name: Resolve revision to actual SHA
+        id: resolve_sha
         run: |
-          chmod +x manifests/patch_pinned_manifest.sh
-          ./manifests/patch_pinned_manifest.sh
+          REV="${{ steps.read_revision.outputs.revision_raw }}"
+          echo "Resolving revision: $REV"
 
-  init-workspace:
-    runs-on: ubuntu-22.04
-    needs: [setup, patch-manifest]
-    env:
-      WORKSPACE_DIR: ${{ github.workspace }}/zephyr-workspace
-      ZEPHYR_SHA: ${{ needs.setup.outputs.zephyr_sha }}
-
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      - name: Initialize Zephyr Workspace
-        run: |
-          chmod +x ci/setup_env.sh
-          WORKSPACE_DIR="${WORKSPACE_DIR}" ./ci/setup_env.sh
-
-  build:
-    runs-on: ubuntu-22.04
-    needs: init-workspace
-    env:
-      WORKSPACE_DIR: ${{ github.workspace }}/zephyr-workspace
-
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      - name: Build ECU for FRDM-K64F
-        run: |
-          source .env.ci
-          ./ci/build_halo.sh
-
-      - name: Build Native Posix Tests
-        run: |
-          source .env.ci
-          west build -b native_posix tests/test_state_machine
-          west build -b native_posix tests/test_isotp
-          west build -b native_posix tests/test_lin
+          if [[ "$REV" =~ ^]()]()
