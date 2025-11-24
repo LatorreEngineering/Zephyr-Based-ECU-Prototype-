@@ -1,17 +1,12 @@
 #!/usr/bin/env bash
-# =============================================================================
-# Zephyr ECU Prototype - CI Environment Setup Script
-# =============================================================================
 set -euo pipefail
 
-# ---------------------------------------------------------------------------
+# -----------------------------------------------------------------------------
 # Paths
-# ---------------------------------------------------------------------------
+# -----------------------------------------------------------------------------
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 WORKSPACE_DIR="${WORKSPACE_DIR:-${HOME}/zephyr-workspace}"
-ZEPHYR_VERSION="${ZEPHYR_VERSION:-v3.7-branch}"
-WEST_MANIFEST_FILE="${WEST_MANIFEST_FILE:-manifests/pinned_manifest.xml}"
 
 # Colors
 RED='\033[0;31m'
@@ -19,13 +14,13 @@ GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 NC='\033[0m'
 
-log() { echo -e "${GREEN}[INFO]${NC} $*"; }
-err() { echo -e "${RED}[ERROR]${NC} $*" >&2; }
+log()  { echo -e "${GREEN}[INFO]${NC} $*"; }
+err()  { echo -e "${RED}[ERROR]${NC} $*" >&2; }
 step() { echo -e "\n==========================================\n$*\n=========================================="; }
 
-# ---------------------------------------------------------------------------
+# -----------------------------------------------------------------------------
 # Dependency Checks
-# ---------------------------------------------------------------------------
+# -----------------------------------------------------------------------------
 check_dependencies() {
     step "Checking Dependencies"
     for cmd in python3 pip git cmake ninja sed; do
@@ -34,23 +29,26 @@ check_dependencies() {
     log "All dependencies available"
 }
 
-# ---------------------------------------------------------------------------
+# -----------------------------------------------------------------------------
 # Patch pinned manifest
-# ---------------------------------------------------------------------------
+# -----------------------------------------------------------------------------
 patch_pinned_manifest() {
     step "Patching pinned manifest"
 
-    if [ ! -f "${SCRIPT_DIR}/patch_pinned_manifest.sh" ]; then
-        err "Missing: ci/patch_pinned_manifest.sh"
+    PATCH_SCRIPT="${PROJECT_ROOT}/manifests/patch_pinned_manifest.sh"
+
+    if [ ! -f "$PATCH_SCRIPT" ]; then
+        err "Missing: manifests/patch_pinned_manifest.sh"
         exit 1
     fi
 
-    bash "${SCRIPT_DIR}/patch_pinned_manifest.sh"
+    chmod +x "$PATCH_SCRIPT"
+    bash "$PATCH_SCRIPT"
 }
 
-# ---------------------------------------------------------------------------
+# -----------------------------------------------------------------------------
 # Python Env
-# ---------------------------------------------------------------------------
+# -----------------------------------------------------------------------------
 setup_python_env() {
     step "Setting up Python environment"
     python3 -m pip install --upgrade pip
@@ -58,9 +56,9 @@ setup_python_env() {
     pip install pyelftools cantools pyyaml intelhex pyserial pytest
 }
 
-# ---------------------------------------------------------------------------
+# -----------------------------------------------------------------------------
 # Initialize Workspace
-# ---------------------------------------------------------------------------
+# -----------------------------------------------------------------------------
 init_workspace() {
     step "Initializing Zephyr workspace"
 
@@ -70,27 +68,25 @@ init_workspace() {
     log "Running: west init -l $PROJECT_ROOT"
     west init -l "$PROJECT_ROOT"
 
-    west config manifest.file "$PROJECT_ROOT/$WEST_MANIFEST_FILE"
+    # DO NOT override west.yml with XML file
+    log "Using west.yml normally (no override)"
 
     log "Workspace initialized"
 }
 
-# ---------------------------------------------------------------------------
+# -----------------------------------------------------------------------------
 # Update Dependencies
-# ---------------------------------------------------------------------------
+# -----------------------------------------------------------------------------
 update_dependencies() {
     step "Updating Zephyr modules"
-
     cd "$WORKSPACE_DIR"
     west update --narrow --fetch-opt=--depth=1
     west zephyr-export
-
-    log "Zephyr dependencies updated"
 }
 
-# ---------------------------------------------------------------------------
-# Verify
-# ---------------------------------------------------------------------------
+# -----------------------------------------------------------------------------
+# Verify Install
+# -----------------------------------------------------------------------------
 verify_installation() {
     step "Verifying installation"
 
@@ -103,9 +99,7 @@ verify_installation() {
     log "Zephyr installed successfully"
 }
 
-# ---------------------------------------------------------------------------
-# Main
-# ---------------------------------------------------------------------------
+# -----------------------------------------------------------------------------
 main() {
     step "Zephyr ECU CI Setup"
     log "Project root: $PROJECT_ROOT"
