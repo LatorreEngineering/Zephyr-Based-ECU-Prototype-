@@ -2,7 +2,7 @@ name: Zephyr ECU CI/CD Pipeline
 
 on:
   push:
-    branches: [main, develop, "feature/**"]
+    branches: [main, develop, 'feature/**']
   pull_request:
     branches: [main, develop]
   workflow_dispatch:
@@ -33,24 +33,113 @@ jobs:
       - name: Install Python packages
         run: |
           python3 -m pip install --upgrade pip
-          pip install west lxml pyelftools cantools pyyaml intelhex pyserial pytest
+          pip install west pyelftools cantools pyyaml intelhex pyserial pytest lxml
 
-      - name: Read revision from pinned_manifest.xml
+      - name: Extract Zephyr revision (branch or SHA) from pinned_manifest.xml
         id: read_revision
         run: |
+          echo "[INFO] Extracting revision from pinned_manifest.xml"
+
           if [[ ! -f manifests/pinned_manifest.xml ]]; then
-            echo "ERROR: manifests/pinned_manifest.xml missing"
+            echo "[ERROR] manifests/pinned_manifest.xml not found!"
+            ls -l manifests || true
             exit 1
           fi
 
           REV=$(xmllint --xpath "string(/manifest/project[@name='zephyr']/@revision)" manifests/pinned_manifest.xml || true)
+
+          if [[ -z "$REV" ]]; then
+            echo "[ERROR] Failed to extract revision attribute from pinned_manifest.xml"
+            exit 1
+          fi
+
+          echo "[INFO] Extracted revision: $REV"
           echo "revision_raw=$REV" >> $GITHUB_OUTPUT
-          echo "Found revision field: $REV"
 
       - name: Resolve revision to actual SHA
         id: resolve_sha
         run: |
-          REV="${{ steps.read_revision.outputs.revision_raw }}"
-          echo "Resolving revision: $REV"
+          # Avoid YAML interpolation issues using single quotes
+          REV='${{ steps.read_revision.outputs.revision_raw }}'
+          echo "[INFO] Resolving revision: $REV"
 
-          if [[ "$REV" =~ ^]()]()
+          # If already a SHA, accept directly
+          if [[ "$REV" =~ ^[0-9a-f]{40}$ ]]; then
+              echo "[INFO] Revision is already a SHA"
+              echo "zephyr_sha=$REV" >> $GITHUB_OUTPUT
+              exit 0
+          fi
+
+          echo "[INFO] Revision is NOT SHA → resolving branch/tag to commit SHA"
+
+          SHA=$(git ls-remote https://github.com/zephyrproject-rtos/zephyr.git "$REV" | awk '{print $1}')
+
+          if [[ -z "$SHA" ]]; then
+            echo "[ERROR] Failed to resolve '$REV' to a commit SHA"
+            exit 1
+          fi
+
+          echo "[INFO] Resolved $REV → $SHA"
+          echo "zephyr_sha=$SHA" >> $GITHUB_OUTPUT
+
+  patch-manifest:
+    runs-on: ubuntu-22.04
+    needs: setup
+
+    outputs:
+      sha: ${{ needs.setup.outputs.zephyr_sha }}
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Patch pinned_manifest.xml with resolved Zephyr SHA
+        env:
+          ZEPHYR_SHA: ${{ needs.setup.outputs.zephyr_sha }}
+        run: |
+          echo "[INFO] Applying SHA: $ZEPHYR_SHA"
+          chmod +x manifests/patch_pinned_manifest.sh
+          ./manifests/patch_pinned_manifest.sh
+
+  init-workspace:
+    runs-on: ubuntu-22.04
+    needs: [setup, patch-manifest]
+
+    env:
+      WORKSPACE_DIR: ${{ github.workspace }}/zephyr-workspace
+      ZEPHYR_SHA: ${{ needs.setup.outputs.zephyr_sha }}
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Initialize Zephyr Workspace
+        run: |
+          chmod +x ci/setup_env.sh
+          WORKSPACE_DIR="${WORKSPACE_DIR}" ./ci/setup_env.sh
+
+  build:
+    runs-on: ubuntu-22.04
+    needs: init-workspace
+
+    env:
+      WORKSPACE_DIR: ${{ github.workspace }}/zephyr-workspace
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Build ECU for FRDM-K64F
+        run: |
+          source .env.ci
+          ./ci/build_halo.sh
+
+      - name: Build Native Posix Tests
+        run: |
+          source .env.ci
+          west build -b native_posix tests/test_state_machine
+          west build -b native_posix tests/test_isotp
+          west build -b native_posix tests/test_lin
