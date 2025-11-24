@@ -15,43 +15,55 @@ jobs:
       zephyr_sha: ${{ steps.extract.outputs.zephyr_sha }}
 
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # ensure all files and history
 
       - name: Install OS packages
         run: |
           sudo apt-get update
-          sudo apt-get install -y cmake ninja-build git python3-pip
+          sudo apt-get install -y libxml2-utils cmake ninja-build git python3-pip
 
-      - name: Setup Python + West
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install Python packages
         run: |
           python3 -m pip install --upgrade pip
-          pip install west lxml pyelftools cantools pyyaml intelhex pyserial pytest
+          pip install west pyelftools cantools pyyaml intelhex pyserial pytest lxml
 
       - name: Extract Zephyr SHA from pinned_manifest.xml
         id: extract
         run: |
+          echo "[INFO] Current directory: $(pwd)"
           if [[ ! -f manifests/pinned_manifest.xml ]]; then
-            echo "[ERROR] Manifest file not found"
+            echo "[ERROR] manifests/pinned_manifest.xml not found!"
+            ls -l manifests || true
             exit 1
           fi
-          # robust extraction
-          SHA=$(grep 'project name="zephyr"' manifests/pinned_manifest.xml | sed -E 's/.*revision="([^"]+)".*/\1/')
+
+          SHA=$(xmllint --xpath "string(/manifest/project[@name='zephyr']/@revision)" manifests/pinned_manifest.xml || true)
           if [[ -z "$SHA" ]]; then
             echo "[ERROR] Could not extract Zephyr SHA from pinned_manifest.xml"
             exit 1
           fi
+
           echo "zephyr_sha=$SHA" >> "$GITHUB_OUTPUT"
-          echo "Found Zephyr SHA: $SHA"
+          echo "[INFO] Found Zephyr SHA: $SHA"
 
   patch-manifest:
     runs-on: ubuntu-22.04
     needs: setup
-
     outputs:
       sha: ${{ needs.setup.outputs.zephyr_sha }}
 
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Patch pinned manifest
         env:
@@ -63,15 +75,16 @@ jobs:
   init-workspace:
     runs-on: ubuntu-22.04
     needs: [setup, patch-manifest]
-
     env:
       WORKSPACE_DIR: ${{ github.workspace }}/zephyr-workspace
       ZEPHYR_SHA: ${{ needs.setup.outputs.zephyr_sha }}
 
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
-      - name: Initialize West Workspace
+      - name: Initialize Zephyr Workspace
         run: |
           chmod +x ci/setup_env.sh
           WORKSPACE_DIR="${WORKSPACE_DIR}" ./ci/setup_env.sh
@@ -79,12 +92,13 @@ jobs:
   build:
     runs-on: ubuntu-22.04
     needs: init-workspace
-
     env:
       WORKSPACE_DIR: ${{ github.workspace }}/zephyr-workspace
 
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Build ECU for FRDM-K64F
         run: |
