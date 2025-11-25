@@ -1,48 +1,59 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Stable workspace root independent of repo name
+echo "[INFO] Starting setup_env.sh"
+
+# Detect project root absolutely, no assumptions:
+PROJECT_ROOT="$(pwd)"
+echo "[INFO] PROJECT_ROOT = $PROJECT_ROOT"
+
+# Stable neutral workspace path
 WS_ROOT="/home/runner/work/ws"
-mkdir -p "$WS_ROOT"
-
-PROJECT_ROOT="$GITHUB_WORKSPACE"
 WORKSPACE_DIR="$WS_ROOT/zephyr-workspace"
-
-PATCH="$PROJECT_ROOT/manifests/patch_pinned_manifest.sh"
-PINNED="$PROJECT_ROOT/manifests/pinned_manifest.xml"
-
-echo "[INFO] Workspace root: $WORKSPACE_DIR"
 mkdir -p "$WORKSPACE_DIR"
 
-# Ensure west exists
-python3 -m pip install --upgrade west
+echo "[INFO] Workspace: $WORKSPACE_DIR"
 
-# Initialize west in a clean neutral path
+# Ensure west is installed
+python3 -m pip install --user --upgrade west
+
+# --- Clean workspace to prevent reuse of wrong west states ---
+if [ -d "$WORKSPACE_DIR/.west" ]; then
+  echo "[INFO] Cleaning old workspace"
+  rm -rf "$WORKSPACE_DIR/.west"
+fi
+rm -rf "$WORKSPACE_DIR/zephyr" || true
+
+# --- Perform west init ---
+echo "[INFO] Running west init"
 cd "$WORKSPACE_DIR"
 west init -l "$PROJECT_ROOT"
 
-# Fetch Zephyr
+# --- Update ---
+echo "[INFO] Running west update"
 west update --narrow --fetch-opt=--depth=1
 
-# Read Zephyr SHA
-SHA=$(git -C "$WORKSPACE_DIR/zephyr" rev-parse HEAD)
-echo "$SHA" > "$PROJECT_ROOT/zephyr_sha.txt"
+# --- Determine Zephyr SHA ---
+ZEPHYR_SHA="$(git -C "$WORKSPACE_DIR/zephyr" rev-parse HEAD)"
+echo "$ZEPHYR_SHA" > "$PROJECT_ROOT/zephyr_sha.txt"
+echo "[INFO] ZEPHYR_SHA = $ZEPHYR_SHA"
 
-# Patch manifest
+# --- Patch pinned manifest ---
+echo "[INFO] Patching manifest"
+PATCH="$PROJECT_ROOT/manifests/patch_pinned_manifest.sh"
 chmod +x "$PATCH"
-ZEPHYR_SHA="$SHA" "$PATCH"
+ZEPHYR_SHA="$ZEPHYR_SHA" "$PATCH"
 
-# Sync workspace to pinned manifest
-west config manifest.file "$PINNED"
+# --- Apply new manifest configuration ---
+west config manifest.file "$PROJECT_ROOT/manifests/pinned_manifest.xml"
 west update --narrow --fetch-opt=--depth=1
-west zephyr-export
 
-# Create .env.ci
+# --- Export environment ---
+echo "[INFO] Creating .env.ci"
 cat > "$PROJECT_ROOT/.env.ci" <<EOF
-export ZEPHYR_BASE="$WORKSPACE_DIR/zephyr"
-export WORKSPACE_DIR="$WORKSPACE_DIR"
 export PROJECT_ROOT="$PROJECT_ROOT"
+export WORKSPACE_DIR="$WORKSPACE_DIR"
+export ZEPHYR_BASE="$WORKSPACE_DIR/zephyr"
 EOF
 
-echo "[INFO] Setup completed successfully."
-
+echo "[INFO] setup_env.sh completed successfully."
