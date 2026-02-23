@@ -13,7 +13,7 @@ jobs:
     runs-on: ubuntu-22.04
     
     steps:
-      - name: Checkout
+      - name: Checkout Repository
         uses: actions/checkout@v4
         with:
           path: app
@@ -32,89 +32,128 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ~/zephyr-sdk-0.16.5
-          key: zephyr-sdk-0.16.5
+          key: zephyr-sdk-0.16.5-${{ runner.os }}
       
-      - name: Install Zephyr SDK
+      - name: Download and Install Zephyr SDK
         if: steps.cache-sdk.outputs.cache-hit != 'true'
         run: |
           cd ~
           wget -q https://github.com/zephyrproject-rtos/sdk-ng/releases/download/v0.16.5/zephyr-sdk-0.16.5_linux-x86_64.tar.xz
           tar xf zephyr-sdk-0.16.5_linux-x86_64.tar.xz
-          cd zephyr-sdk-0.16.5
-          ./setup.sh -t all -h -c
+          rm zephyr-sdk-0.16.5_linux-x86_64.tar.xz
       
-      - name: Setup SDK (if cached)
-        if: steps.cache-sdk.outputs.cache-hit == 'true'
+      - name: Setup Zephyr SDK
         run: |
           cd ~/zephyr-sdk-0.16.5
           ./setup.sh -t all -h -c
       
-      - name: Install West
-        run: pip3 install west
+      - name: Install West and Python Dependencies
+        run: |
+          pip3 install --user west
+          echo "$HOME/.local/bin" >> $GITHUB_PATH
       
       - name: Initialize West Workspace
         run: |
+          cd ${{ github.workspace }}
           west init -l app
+      
+      - name: Update West Modules
+        run: |
+          cd ${{ github.workspace }}
           west update
       
-      - name: Install Python Requirements
+      - name: Install Zephyr Python Requirements
         run: |
-          pip3 install -r zephyr/scripts/requirements.txt
+          pip3 install --user -r ${{ github.workspace }}/zephyr/scripts/requirements.txt
+      
+      - name: Export Zephyr CMake Package
+        run: |
+          cd ${{ github.workspace }}/zephyr
+          west zephyr-export
+      
+      - name: Verify Zephyr Installation
+        run: |
+          cd ${{ github.workspace }}
+          ls -la
+          ls -la zephyr
+          west list
       
       - name: Build for FRDM-K64F
         run: |
-          cd app
+          cd ${{ github.workspace }}/app
           west build -b frdm_k64f -p always
+        env:
+          ZEPHYR_BASE: ${{ github.workspace }}/zephyr
       
-      - name: Build Size Report
+      - name: Generate Build Reports
         run: |
-          cd app
-          west build -t rom_report
-          west build -t ram_report
+          cd ${{ github.workspace }}/app
+          west build -t rom_report > rom_report.txt || true
+          west build -t ram_report > ram_report.txt || true
+          cat rom_report.txt ram_report.txt || true
+        env:
+          ZEPHYR_BASE: ${{ github.workspace }}/zephyr
       
-      - name: Upload Firmware
+      - name: Upload Firmware Artifacts
         uses: actions/upload-artifact@v4
         with:
           name: firmware-frdm-k64f
           path: |
-            app/build/zephyr/zephyr.bin
-            app/build/zephyr/zephyr.elf
-            app/build/zephyr/zephyr.hex
-            app/build/build_info.txt
+            ${{ github.workspace }}/app/build/zephyr/zephyr.bin
+            ${{ github.workspace }}/app/build/zephyr/zephyr.elf
+            ${{ github.workspace }}/app/build/zephyr/zephyr.hex
+            ${{ github.workspace }}/app/build/build_info.txt
+          if-no-files-found: error
       
-      - name: Build for Native Sim (Test)
+      - name: Build for Native Sim
         run: |
-          cd app
+          cd ${{ github.workspace }}/app
           west build -b native_sim -p always
+        env:
+          ZEPHYR_BASE: ${{ github.workspace }}/zephyr
       
-      - name: Run Native Sim Tests
+      - name: Run Native Sim Test
         run: |
-          cd app
-          timeout 5 ./build/zephyr/zephyr.exe || true
+          cd ${{ github.workspace }}/app
+          timeout 5 ./build/zephyr/zephyr.exe || echo "Test completed or timed out"
 
   static-analysis:
     name: Static Analysis
     runs-on: ubuntu-22.04
     
     steps:
-      - name: Checkout
+      - name: Checkout Repository
         uses: actions/checkout@v4
       
-      - name: Install Tools
+      - name: Install Analysis Tools
         run: |
           sudo apt-get update
           sudo apt-get install -y cppcheck clang-format
       
       - name: Run cppcheck
         run: |
-          cppcheck --enable=all --error-exitcode=0 \
-            -I app -I network -I diagnostics \
+          cppcheck --enable=warning,style,performance,portability \
+            --error-exitcode=0 \
+            --inline-suppr \
             --suppress=missingIncludeSystem \
-            app/ network/ diagnostics/ 2>&1 | tee cppcheck.log
+            --suppress=unmatchedSuppression \
+            -I app -I network -I diagnostics -I storage \
+            app/ network/ diagnostics/ storage/ 2>&1 | tee cppcheck-report.txt
       
       - name: Check Code Formatting
+        continue-on-error: true
         run: |
-          find . -name "*.c" -o -name "*.h" | \
-            grep -v build | \
-            xargs clang-format --dry-run --Werror || \
-            echo "Warning: Code formatting issues found"
+          # Check if clang-format would make changes
+          find . -type f \( -name "*.c" -o -name "*.h" \) \
+            ! -path "*/build/*" \
+            ! -path "*/.git/*" \
+            -exec clang-format --dry-run --Werror {} + || \
+            echo "::warning::Code formatting issues detected - run clang-format locally"
+      
+      - name: Upload Analysis Reports
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: static-analysis-reports
+          path: |
+            cppcheck-report.txt
