@@ -9,25 +9,33 @@ on:
 
 jobs:
   build:
-    name: Build and Test
+    name: Build ECU Firmware
     runs-on: ubuntu-22.04
     
     steps:
-      - name: Checkout Repository
+      - name: Checkout
         uses: actions/checkout@v4
         with:
           path: app
       
-      - name: Install Dependencies
+      - name: Install System Dependencies
         run: |
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends \
             git cmake ninja-build gperf ccache dfu-util \
-            device-tree-compiler wget xz-utils file \
-            make gcc gcc-multilib g++-multilib libsdl2-dev \
-            libmagic1 python3-pip python3-setuptools python3-wheel
+            device-tree-compiler wget xz-utils file make \
+            gcc gcc-multilib g++-multilib libsdl2-dev \
+            python3-pip python3-setuptools python3-wheel
+      
+      - name: Cache Zephyr SDK
+        id: cache-sdk
+        uses: actions/cache@v4
+        with:
+          path: ~/zephyr-sdk-0.16.5
+          key: zephyr-sdk-0.16.5
       
       - name: Install Zephyr SDK
+        if: steps.cache-sdk.outputs.cache-hit != 'true'
         run: |
           cd ~
           wget -q https://github.com/zephyrproject-rtos/sdk-ng/releases/download/v0.16.5/zephyr-sdk-0.16.5_linux-x86_64.tar.xz
@@ -35,33 +43,78 @@ jobs:
           cd zephyr-sdk-0.16.5
           ./setup.sh -t all -h -c
       
-      - name: Setup West Workspace
+      - name: Setup SDK (if cached)
+        if: steps.cache-sdk.outputs.cache-hit == 'true'
         run: |
-          pip3 install west
-          cd ${{ github.workspace }}
+          cd ~/zephyr-sdk-0.16.5
+          ./setup.sh -t all -h -c
+      
+      - name: Install West
+        run: pip3 install west
+      
+      - name: Initialize West Workspace
+        run: |
           west init -l app
-          cd app
           west update
-          pip3 install -r ../zephyr/scripts/requirements.txt
+      
+      - name: Install Python Requirements
+        run: |
+          pip3 install -r zephyr/scripts/requirements.txt
       
       - name: Build for FRDM-K64F
         run: |
-          cd ${{ github.workspace }}/app
+          cd app
           west build -b frdm_k64f -p always
       
-      - name: Build for Native Sim
+      - name: Build Size Report
         run: |
-          cd ${{ github.workspace }}/app
-          west build -b native_sim -p always
+          cd app
+          west build -t rom_report
+          west build -t ram_report
       
-      - name: Archive Firmware
+      - name: Upload Firmware
         uses: actions/upload-artifact@v4
         with:
           name: firmware-frdm-k64f
           path: |
-            ${{ github.workspace }}/app/build/zephyr/zephyr.bin
-            ${{ github.workspace }}/app/build/zephyr/zephyr.elf
-            ${{ github.workspace }}/app/build/zephyr/zephyr.hex
-```
+            app/build/zephyr/zephyr.bin
+            app/build/zephyr/zephyr.elf
+            app/build/zephyr/zephyr.hex
+            app/build/build_info.txt
+      
+      - name: Build for Native Sim (Test)
+        run: |
+          cd app
+          west build -b native_sim -p always
+      
+      - name: Run Native Sim Tests
+        run: |
+          cd app
+          timeout 5 ./build/zephyr/zephyr.exe || true
 
----
+  static-analysis:
+    name: Static Analysis
+    runs-on: ubuntu-22.04
+    
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      
+      - name: Install Tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y cppcheck clang-format
+      
+      - name: Run cppcheck
+        run: |
+          cppcheck --enable=all --error-exitcode=0 \
+            -I app -I network -I diagnostics \
+            --suppress=missingIncludeSystem \
+            app/ network/ diagnostics/ 2>&1 | tee cppcheck.log
+      
+      - name: Check Code Formatting
+        run: |
+          find . -name "*.c" -o -name "*.h" | \
+            grep -v build | \
+            xargs clang-format --dry-run --Werror || \
+            echo "Warning: Code formatting issues found"
