@@ -1,15 +1,30 @@
+# SPDX-License-Identifier: Apache-2.0
+
+# Kconfig - ECU Prototype Configuration
+
+mainmenu "Zephyr ECU Prototype Configuration"
+
+# Source Zephyr's Kconfig
+source "Kconfig.zephyr"
+
 menu "ECU Prototype Options"
 
 config ECU_ENABLE_LIN
     bool "Enable LIN Master"
     default y
+    help
+      Enable LIN bus master functionality
 
 config ECU_ENABLE_UDS
     bool "Enable full UDS stack"
     default y
+    help
+      Enable complete UDS diagnostic services
 
 config ECU_FAULT_INJECTION
     bool "Enable fault injection"
     default y
+    help
+      Enable runtime fault injection for testing
 
 endmenu
