@@ -5,7 +5,7 @@
 [![Zephyr](https://img.shields.io/badge/Zephyr-v3.7-blue)](https://github.com/zephyrproject-rtos/zephyr)
 
 **Production-ready automotive ECU architecture on Zephyr RTOS**  
-**Aligned with Non-AUTOSAR SDV Raul Latorre Platform Vision**
+**Aligned with OSS_SDV SDV Raul Latorre Platform Vision**
 
 ##  Project Overview
 
@@ -16,7 +16,7 @@ This project demonstrates a **fully functional automotive-style ECU** implemente
 ✅ **Safety-oriented design** - Watchdog, fault injection, DTC management  
 ✅ **Production CI/CD pipeline** - Reproducible builds, automated testing  
 ✅ **Modular architecture** - AUTOSAR-inspired layer separation  
-✅ ***Aligned with Non-AUTOSAR SDV Raul Latorre Platform Vision** - Non-AUTOSAR platform readiness
+✅ ***Aligned with OSS_SDV Raul Latorre Platform Vision** - Non-AUTOSAR platform readiness
 
 ---
 
