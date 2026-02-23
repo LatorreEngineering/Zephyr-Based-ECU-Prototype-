@@ -1,4 +1,5 @@
 #pragma once
+#include <stdbool.h>
 
 typedef enum {
     ECU_OFF,
@@ -10,6 +11,11 @@ void ecu_init_state_machine(void);
 void ecu_state_update(void);
 ecu_state_t ecu_get_state(void);
 
+// State check functions
 int ignition_on(void);
 int fault_detected(void);
 int reset_triggered(void);
+
+// Control functions
+void ecu_trigger_reset(void);
+void ecu_set_fault(bool fault);
