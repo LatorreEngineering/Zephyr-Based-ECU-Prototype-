@@ -1,6 +1,7 @@
 #include "isotp_can.h"
 #include "../../network/can/can_transport.h"
 #include <zephyr/kernel.h>
+#include <string.h>
 
 #define ISOTP_MAX_FRAME 8
 
