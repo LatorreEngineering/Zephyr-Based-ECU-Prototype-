@@ -1,6 +1,6 @@
 #include "comm_manager.h"
-#include "../network/can/can_transport.h"
-#include "../network/lin/lin_scheduler.h"
+#include "can/can_transport.h"
+#include "lin/lin_scheduler.h"
 #include "../diagnostics/uds_server.h"
 #include "../app/fault_injection.h"
 #include <zephyr/kernel.h>
@@ -14,6 +14,7 @@ static struct k_timer cm_lin_timer;
 /* CAN TX task */
 static void cm_can_tx_handler(struct k_timer *timer)
 {
+    (void)timer;
     uint8_t msg[8] = {0};
 
     // Example: send periodic heartbeat or status
@@ -28,6 +29,7 @@ static void cm_can_tx_handler(struct k_timer *timer)
 /* LIN task */
 static void cm_lin_handler(struct k_timer *timer)
 {
+    (void)timer;
     // Trigger LIN scheduler (sends scheduled headers)
     lin_scheduler_start();
 }
@@ -45,6 +47,8 @@ void comm_manager_init(void)
     k_timer_init(&cm_lin_timer, cm_lin_handler, NULL);
     k_timer_start(&cm_lin_timer, K_MSEC(CM_LIN_CHECK_INTERVAL_MS),
                   K_MSEC(CM_LIN_CHECK_INTERVAL_MS));
+    
+    printk("Communication manager initialized\n");
 }
 
 /* Process incoming CAN messages for UDS */
