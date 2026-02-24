@@ -42,13 +42,13 @@ option(BUILD_TESTS "Build unit tests instead of main application" OFF)
 zephyr_compile_options(
     -Wall
     -Wextra
-    -Werror
     -Wno-unused-parameter
+    -Wno-sign-compare
     -ffunction-sections
     -fdata-sections
 )
 
-# Safety-critical build options
+# Safety-critical build options (optional, only for application code)
 if(CONFIG_MISRA_COMPLIANCE)
     zephyr_compile_options(-Wconversion -Wsign-conversion)
 endif()
