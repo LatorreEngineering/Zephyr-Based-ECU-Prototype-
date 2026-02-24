@@ -1,14 +1,12 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 /* FRDM-K64F Board Overlay for ECU Prototype */
 
-/* Enable CAN0 */
-&can0 {
+/* Enable FlexCAN0 */
+&flexcan0 {
     status = "okay";
     bus-speed = <500000>;
     sjw = <1>;
-    prop-seg = <7>;
-    phase-seg1 = <6>;
-    phase-seg2 = <1>;
+    sample-point = <875>;
 };
 
 /* Enable UART3 for LIN */
@@ -24,7 +22,7 @@
         #address-cells = <1>;
         #size-cells = <1>;
 
-        /* Reserve 256KB at the end of flash for storage */
+        /* Reserve 16KB at the end of flash for storage */
         storage_partition: partition@fc000 {
             label = "storage";
             reg = <0x000fc000 0x00004000>;
