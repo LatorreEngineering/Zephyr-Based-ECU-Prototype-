@@ -19,7 +19,7 @@ This project demonstrates a **fully functional automotive-style ECU** implemente
 ✅ **Safety-oriented design** - Watchdog, fault injection, DTC management  
 ✅ **Production CI/CD pipeline** - Reproducible builds, automated testing  
 ✅ **Modular architecture** - AUTOSAR-inspired layer separation  
-✅ **Aligned with OSS_SDV Raul Latorre Platform Vision** 
+✅ **Aligned with OSS_SDV Raul Latorre Platform Vision**   
 ✅ **Fully buildable** - All dependencies resolved, compiles cleanly
 
 ---
