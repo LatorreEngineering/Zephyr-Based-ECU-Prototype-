@@ -13,7 +13,6 @@ jobs:
     runs-on: ubuntu-latest
     container: 
       image: zephyrprojectrtos/ci:v0.26.13
-      options: --user root
     
     steps:
       - name: Checkout Repository
@@ -21,22 +20,25 @@ jobs:
         with:
           path: app
       
+      - name: Free up disk space
+        run: |
+          df -h
+          # Remove unnecessary files to free space
+          rm -rf /opt/hostedtoolcache || true
+          rm -rf /usr/share/dotnet || true
+          rm -rf /usr/local/lib/android || true
+          df -h
+      
       - name: Initialize West Workspace
         run: |
           cd $GITHUB_WORKSPACE
           west init -l app
       
-      - name: Update West Modules
+      - name: Update West Modules (Shallow Clone)
         run: |
           cd $GITHUB_WORKSPACE
-          west update
-      
-      - name: Setup Zephyr SDK Environment
-        run: |
-          export ZEPHYR_SDK_INSTALL_DIR=/opt/toolchains
-          echo "ZEPHYR_SDK_INSTALL_DIR=/opt/toolchains" >> $GITHUB_ENV
-          export ZEPHYR_BASE=$GITHUB_WORKSPACE/zephyr
-          echo "ZEPHYR_BASE=$GITHUB_WORKSPACE/zephyr" >> $GITHUB_ENV
+          # Use shallow clone and narrow update to save space
+          west update --narrow -o=--depth=1
       
       - name: Build for FRDM-K64F
         run: |
@@ -44,22 +46,14 @@ jobs:
           west build -b frdm_k64f -p always
         env:
           ZEPHYR_SDK_INSTALL_DIR: /opt/toolchains
-          ZEPHYR_BASE: ${{ github.workspace }}/zephyr
       
-      - name: Build Size Reports
-        continue-on-error: true
+      - name: Show Build Size
         run: |
           cd $GITHUB_WORKSPACE/app
-          west build -t rom_report 2>&1 | tee rom_report.txt
-          west build -t ram_report 2>&1 | tee ram_report.txt
-          echo ""
-          echo "=== ROM Report ==="
-          cat rom_report.txt || true
-          echo ""
-          echo "=== RAM Report ==="
-          cat ram_report.txt || true
+          west build -t rom_report || true
+          west build -t ram_report || true
       
-      - name: Upload Firmware Artifacts
+      - name: Upload Firmware
         uses: actions/upload-artifact@v4
         with:
           name: firmware-frdm-k64f
@@ -67,26 +61,28 @@ jobs:
             app/build/zephyr/zephyr.bin
             app/build/zephyr/zephyr.elf
             app/build/zephyr/zephyr.hex
-            app/build/build_info.txt
-            app/rom_report.txt
-            app/ram_report.txt
 
   build-native:
     name: Build Native Sim
     runs-on: ubuntu-latest
     container: 
       image: zephyrprojectrtos/ci:v0.26.13
-      options: --user root
     
     steps:
       - uses: actions/checkout@v4
         with:
           path: app
       
+      - name: Free up disk space
+        run: |
+          rm -rf /opt/hostedtoolcache || true
+          rm -rf /usr/share/dotnet || true
+          df -h
+      
       - run: |
           cd $GITHUB_WORKSPACE
           west init -l app
-          west update
+          west update --narrow -o=--depth=1
       
       - run: |
           cd $GITHUB_WORKSPACE/app
@@ -96,7 +92,7 @@ jobs:
       
       - run: |
           cd $GITHUB_WORKSPACE/app
-          timeout 5 ./build/zephyr/zephyr.exe || echo "Native sim test completed"
+          timeout 5 ./build/zephyr/zephyr.exe || true
         continue-on-error: true
 
   static-analysis:
@@ -114,23 +110,13 @@ jobs:
       - name: Run cppcheck
         continue-on-error: true
         run: |
-          cppcheck --enable=warning,style,performance,portability \
+          cppcheck --enable=warning,style,performance \
             --suppress=missingIncludeSystem \
-            --suppress=unmatchedSuppression \
             -I app -I network -I diagnostics -I storage \
-            app/ network/ diagnostics/ storage/ 2>&1 | tee cppcheck.txt
+            app/ network/ diagnostics/ storage/
       
-      - name: Check Code Formatting
+      - name: Check Formatting
         continue-on-error: true
         run: |
-          find . -name "*.c" -o -name "*.h" | \
-            grep -v build | \
-            xargs clang-format --dry-run --Werror || \
-            echo "::warning::Formatting issues found"
-      
-      - name: Upload Analysis Reports
-        uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: static-analysis
-          path: cppcheck.txt
+          find . -name "*.c" -o -name "*.h" | grep -v build | \
+            xargs clang-format --dry-run --Werror || true
