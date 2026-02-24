@@ -3,27 +3,15 @@
 manifest:
   version: "0.13"
 
-  defaults:
-    remote: zephyrproject
-
   remotes:
-    - name: zephyrproject
+    - name: zephyrproject-rtos
       url-base: https://github.com/zephyrproject-rtos
 
   projects:
     - name: zephyr
-      remote: zephyrproject
+      remote: zephyrproject-rtos
       revision: v3.7-branch
-      import:
-        # Import Zephyr's own manifest to get all dependencies
-        name-allowlist:
-          - cmsis
-          - hal_nxp
-          - mbedtls
-          - mcuboot
-          - picolibc
-          - segger
-          - tinycrypt
+      import: true
 
   self:
     path: app
