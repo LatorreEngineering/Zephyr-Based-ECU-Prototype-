@@ -5,7 +5,7 @@
 #include "watchdog_supervisor.h"
 #include "../diagnostics/uds_server.h"
 
-void main(void)
+int main(void)
 {
     printk("Starting Zephyr ECU Prototype\n");
 
@@ -23,4 +23,6 @@ void main(void)
         watchdog_kick();
         k_sleep(K_MSEC(10));
     }
+
+    return 0;
 }
