@@ -8,50 +8,51 @@ on:
   workflow_dispatch:
 
 jobs:
-  build:
-    name: Build ECU Firmware
+  build-all:
+    name: Build Firmware
     runs-on: ubuntu-latest
-    container: 
-      image: zephyrprojectrtos/ci:v0.26.13
+    container: zephyrprojectrtos/ci:v0.26.13
     
     steps:
-      - name: Checkout Repository
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
         with:
           path: app
       
-      - name: Free up disk space
+      - name: Free Disk Space
         run: |
+          echo "=== Disk usage before cleanup ==="
           df -h
-          # Remove unnecessary files to free space
           rm -rf /opt/hostedtoolcache || true
           rm -rf /usr/share/dotnet || true
           rm -rf /usr/local/lib/android || true
+          echo "=== Disk usage after cleanup ==="
           df -h
       
-      - name: Initialize West Workspace
+      - name: Setup Workspace
         run: |
           cd $GITHUB_WORKSPACE
           west init -l app
-      
-      - name: Update West Modules (Shallow Clone)
-        run: |
-          cd $GITHUB_WORKSPACE
-          # Use shallow clone and narrow update to save space
           west update --narrow -o=--depth=1
       
-      - name: Build for FRDM-K64F
+      - name: Build FRDM-K64F
         run: |
           cd $GITHUB_WORKSPACE/app
           west build -b frdm_k64f -p always
         env:
           ZEPHYR_SDK_INSTALL_DIR: /opt/toolchains
       
-      - name: Show Build Size
+      - name: Build Reports
+        continue-on-error: true
         run: |
           cd $GITHUB_WORKSPACE/app
-          west build -t rom_report || true
-          west build -t ram_report || true
+          echo "=== ROM Report ==="
+          west build -t rom_report 2>&1 | tee rom_report.txt
+          echo ""
+          echo "=== RAM Report ==="
+          west build -t ram_report 2>&1 | tee ram_report.txt
+          echo ""
+          cat rom_report.txt
+          cat ram_report.txt
       
       - name: Upload Firmware
         uses: actions/upload-artifact@v4
@@ -61,19 +62,19 @@ jobs:
             app/build/zephyr/zephyr.bin
             app/build/zephyr/zephyr.elf
             app/build/zephyr/zephyr.hex
+            app/build/build_info.txt
 
   build-native:
     name: Build Native Sim
     runs-on: ubuntu-latest
-    container: 
-      image: zephyrprojectrtos/ci:v0.26.13
+    container: zephyrprojectrtos/ci:v0.26.13
     
     steps:
       - uses: actions/checkout@v4
         with:
           path: app
       
-      - name: Free up disk space
+      - name: Free Disk Space
         run: |
           rm -rf /opt/hostedtoolcache || true
           rm -rf /usr/share/dotnet || true
@@ -92,7 +93,7 @@ jobs:
       
       - run: |
           cd $GITHUB_WORKSPACE/app
-          timeout 5 ./build/zephyr/zephyr.exe || true
+          timeout 5 ./build/zephyr/zephyr.exe || echo "Native sim test completed"
         continue-on-error: true
 
   static-analysis:
@@ -119,4 +120,4 @@ jobs:
         continue-on-error: true
         run: |
           find . -name "*.c" -o -name "*.h" | grep -v build | \
-            xargs clang-format --dry-run --Werror || true
+            xargs clang-format --dry-run --Werror || echo "Formatting issues found"
