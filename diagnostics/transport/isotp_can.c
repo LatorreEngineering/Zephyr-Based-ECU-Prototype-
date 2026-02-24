@@ -18,7 +18,7 @@ int isotp_send(uint8_t *data, uint16_t len)
         uint8_t frame[ISOTP_MAX_FRAME];
         int frame_len = (len - sent > ISOTP_MAX_FRAME) ? ISOTP_MAX_FRAME : len - sent;
         memcpy(frame, data + sent, frame_len);
-        can_send(frame, frame_len);
+        ecu_can_send(frame, frame_len);
         sent += frame_len;
         k_sleep(K_MSEC(1));
     }
@@ -27,6 +27,6 @@ int isotp_send(uint8_t *data, uint16_t len)
 
 int isotp_receive(uint8_t *buf, uint16_t buf_len)
 {
-    int len = can_receive(buf, buf_len);
+    int len = ecu_can_receive(buf, buf_len);
     return len;
 }
