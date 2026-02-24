@@ -7,6 +7,7 @@ static const struct device *uart_dev;
 
 int lin_init(void)
 {
+#if DT_NODE_EXISTS(DT_NODELABEL(uart3))
     uart_dev = DEVICE_DT_GET(DT_NODELABEL(uart3));
     
     if (!device_is_ready(uart_dev)) {
@@ -31,14 +32,20 @@ int lin_init(void)
     
     printk("LIN driver initialized\n");
     return 0;
+#else
+    printk("LIN: uart3 not available on this board\n");
+    uart_dev = NULL;
+    return -ENOTSUP;
+#endif
 }
 
 int lin_send_break(void)
 {
     if (!uart_dev) {
-        return -1;
+        return -ENODEV;
     }
     
+#if DT_NODE_EXISTS(DT_NODELABEL(uart3))
     // Send break signal (13-bit dominant)
     uart_line_ctrl_set(uart_dev, UART_LINE_CTRL_BAUD_RATE, 9600);
     uart_poll_out(uart_dev, 0x00);
@@ -46,18 +53,26 @@ int lin_send_break(void)
     uart_line_ctrl_set(uart_dev, UART_LINE_CTRL_BAUD_RATE, 19200);
     
     return 0;
+#else
+    return -ENOTSUP;
+#endif
 }
 
 int lin_send_header(uint8_t pid)
 {
     if (!uart_dev) {
-        return -1;
+        return -ENODEV;
     }
     
+#if DT_NODE_EXISTS(DT_NODELABEL(uart3))
     lin_send_break();
     uart_poll_out(uart_dev, 0x55); // Sync byte
     k_usleep(100);
     uart_poll_out(uart_dev, pid);  // Protected ID
     
     return 0;
+#else
+    (void)pid;
+    return -ENOTSUP;
+#endif
 }
