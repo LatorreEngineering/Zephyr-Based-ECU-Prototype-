@@ -14,37 +14,3 @@
     status = "okay";
     current-speed = <19200>;
 };
-
-/* 
- * Flash partition layout
- * Total: 1MB
- * - Application: 0x00000000 - 0x000EFFFF (960KB)
- * - Storage:     0x000F0000 - 0x000FFFFF (64KB)
- */
-
-/* Delete existing partition definitions */
-/delete-node/ &boot_partition;
-/delete-node/ &slot0_partition;
-/delete-node/ &slot1_partition;
-/delete-node/ &scratch_partition;
-/delete-node/ &storage_partition;
-
-&flash0 {
-    partitions {
-        compatible = "fixed-partitions";
-        #address-cells = <1>;
-        #size-cells = <1>;
-
-        /* Application image - 960KB */
-        slot0_partition: partition@0 {
-            label = "image-0";
-            reg = <0x00000000 0x000F0000>;
-        };
-
-        /* NVS storage - 64KB */
-        storage_partition: partition@f0000 {
-            label = "storage";
-            reg = <0x000F0000 0x00010000>;
-        };
-    };
-};
