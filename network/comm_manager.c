@@ -23,7 +23,7 @@ static void cm_can_tx_handler(struct k_timer *timer)
         msg[0] = 0xFF; // simulate CAN fault
     }
 
-    can_send(msg, sizeof(msg));
+    ecu_can_send(msg, sizeof(msg));
 }
 
 /* LIN task */
@@ -55,7 +55,7 @@ void comm_manager_init(void)
 void comm_manager_process(void)
 {
     uint8_t rx_buf[64];
-    int len = can_receive(rx_buf, sizeof(rx_buf));
+    int len = ecu_can_receive(rx_buf, sizeof(rx_buf));
     if (len > 0) {
         // Forward to UDS processing
         uds_handle_request(rx_buf, len, NULL); // rsp handled internally
