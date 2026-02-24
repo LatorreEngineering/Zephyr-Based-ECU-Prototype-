@@ -24,7 +24,7 @@ void can_init(void)
     }
 }
 
-int can_send(uint8_t *data, uint8_t len)
+int ecu_can_send(uint8_t *data, uint8_t len)
 {
     if (!can_dev || !device_is_ready(can_dev)) {
         return -ENODEV;
@@ -42,23 +42,38 @@ int can_send(uint8_t *data, uint8_t len)
     
     memcpy(frame.data, data, len);
     
+    // Use Zephyr's can_send API
     return can_send(can_dev, &frame, K_MSEC(100), NULL, NULL);
 }
 
-int can_receive(uint8_t *buf, uint8_t max_len)
+int ecu_can_receive(uint8_t *buf, uint8_t max_len)
 {
     if (!can_dev || !device_is_ready(can_dev)) {
         return -ENODEV;
     }
     
     struct can_frame frame;
-    int ret = can_read(can_dev, &frame, K_NO_WAIT, NULL);
+    
+    // Use can_read for receiving
+    struct can_filter filter = {
+        .flags = 0,
+        .id = 0x7E8,  // UDS response ID
+        .mask = CAN_STD_ID_MASK
+    };
+    
+    int ret = can_add_rx_filter(can_dev, NULL, &filter);
+    if (ret < 0) {
+        return ret;
+    }
+    
+    // Try to receive a frame
+    ret = can_recv(can_dev, &frame, K_NO_WAIT);
     if (ret != 0) {
         return ret;
     }
     
-    int len = (frame.dlc > max_len) ? max_len : frame.dlc;
-    memcpy(buf, frame.data, len);
+    int copy_len = (frame.dlc > max_len) ? max_len : frame.dlc;
+    memcpy(buf, frame.data, copy_len);
     
-    return len;
+    return copy_len;
 }
