@@ -1,15 +1,7 @@
 /* SPDX-License-Identifier: Apache-2.0 */
-/*
- * FRDM-K64F Device Tree Overlay for Zephyr ECU Prototype
- * Compatible with Zephyr v3.7+
- */
+/* FRDM-K64F Device Tree Overlay for Zephyr ECU Prototype */
 
-/* 
- * FlexCAN Controller Configuration
- * Node: flexcan0 (not can0 in Zephyr v3.7+)
- * Pins: PTE24 (TX), PTE25 (RX)
- * Bitrate: 500 kbps
- */
+/* FlexCAN0 - CAN bus at 500 kbps */
 &flexcan0 {
     status = "okay";
     bus-speed = <500000>;
@@ -17,35 +9,42 @@
     sample-point = <875>;
 };
 
-/* 
- * UART3 Configuration for LIN Bus
- * Pins: PTC16 (TX), PTC17 (RX)
- * Baud Rate: 19200 bps
- */
+/* UART3 - LIN bus at 19200 baud */
 &uart3 {
     status = "okay";
     current-speed = <19200>;
 };
 
-/*
- * Flash Partitioning for Non-Volatile Storage (NVS)
- * Total Flash: 1MB (0x00000000 - 0x000FFFFF)
- * NVS Partition: 16KB at end of flash (0x000FC000 - 0x000FFFFF)
+/* 
+ * Flash partition layout
+ * Total: 1MB
+ * - Application: 0x00000000 - 0x000EFFFF (960KB)
+ * - Storage:     0x000F0000 - 0x000FFFFF (64KB)
  */
+
+/* Delete existing partition definitions */
+/delete-node/ &boot_partition;
+/delete-node/ &slot0_partition;
+/delete-node/ &slot1_partition;
+/delete-node/ &scratch_partition;
+/delete-node/ &storage_partition;
+
 &flash0 {
     partitions {
         compatible = "fixed-partitions";
         #address-cells = <1>;
         #size-cells = <1>;
 
-        /* 
-         * Storage partition for DTC persistence
-         * Location: Last 16KB of flash
-         * Size: 0x4000 (16KB)
-         */
-        storage_partition: partition@fc000 {
+        /* Application image - 960KB */
+        slot0_partition: partition@0 {
+            label = "image-0";
+            reg = <0x00000000 0x000F0000>;
+        };
+
+        /* NVS storage - 64KB */
+        storage_partition: partition@f0000 {
             label = "storage";
-            reg = <0x000FC000 0x00004000>;
+            reg = <0x000F0000 0x00010000>;
         };
     };
 };
