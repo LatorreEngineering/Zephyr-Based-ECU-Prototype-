@@ -1,12 +1,10 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 /* FRDM-K64F Device Tree Overlay for Zephyr ECU Prototype */
 
-/* FlexCAN0 - CAN bus at 500 kbps */
+/* FlexCAN0 - CAN bus configuration for Zephyr v3.7+ */
 &flexcan0 {
     status = "okay";
-    bus-speed = <500000>;
-    sjw = <1>;
-    sample-point = <875>;
+    bitrate = <500000>;
 };
 
 /* UART3 - LIN bus at 19200 baud */
