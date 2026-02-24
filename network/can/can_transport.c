@@ -7,7 +7,8 @@ static const struct device *can_dev;
 
 void can_init(void)
 {
-    can_dev = DEVICE_DT_GET(DT_NODELABEL(can0));
+    // Use flexcan0 node label (Zephyr v3.7+)
+    can_dev = DEVICE_DT_GET(DT_NODELABEL(flexcan0));
     
     if (!device_is_ready(can_dev)) {
         printk("CAN device not ready\n");
