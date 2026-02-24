@@ -1,4 +1,5 @@
 #pragma once
+#include <stdint.h>
 
 void sensor_sim_init(void);
 void sensor_sim_update(void);
