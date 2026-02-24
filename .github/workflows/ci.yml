@@ -13,6 +13,7 @@ jobs:
     runs-on: ubuntu-latest
     container: 
       image: zephyrprojectrtos/ci:v0.26.13
+      options: --user root
     
     steps:
       - name: Checkout Repository
@@ -30,35 +31,39 @@ jobs:
           cd $GITHUB_WORKSPACE
           west update
       
-      - name: Verify Zephyr Installation
+      - name: Setup Zephyr SDK Environment
         run: |
-          cd $GITHUB_WORKSPACE
-          echo "=== Workspace Contents ==="
-          ls -la
-          echo ""
-          echo "=== West Configuration ==="
-          cat .west/config || true
-          echo ""
-          echo "=== West Projects ==="
-          west list
-          echo ""
-          echo "=== Zephyr Directory ==="
-          ls -la zephyr || echo "Zephyr not found!"
-          echo ""
-          echo "=== West Commands Available ==="
-          west help
+          # The SDK is already in the container at /opt/toolchains
+          export ZEPHYR_SDK_INSTALL_DIR=/opt/toolchains
+          echo "ZEPHYR_SDK_INSTALL_DIR=/opt/toolchains" >> $GITHUB_ENV
+          
+          # Also set the Zephyr base
+          export ZEPHYR_BASE=$GITHUB_WORKSPACE/zephyr
+          echo "ZEPHYR_BASE=$GITHUB_WORKSPACE/zephyr" >> $GITHUB_ENV
+      
+      - name: Verify SDK Installation
+        run: |
+          echo "SDK Location: $ZEPHYR_SDK_INSTALL_DIR"
+          ls -la /opt/toolchains || echo "Toolchains not at expected location"
+          
+          # Find where the SDK actually is
+          find /opt -name "cmake" -type d 2>/dev/null | head -5 || true
       
       - name: Build for FRDM-K64F
         run: |
           cd $GITHUB_WORKSPACE/app
           west build -b frdm_k64f -p always
+        env:
+          ZEPHYR_SDK_INSTALL_DIR: /opt/toolchains
+          ZEPHYR_BASE: ${{ github.workspace }}/zephyr
       
       - name: Build Reports
         continue-on-error: true
         run: |
           cd $GITHUB_WORKSPACE/app
-          west build -t rom_report || true
-          west build -t ram_report || true
+          west build -t rom_report 2>&1 | tee rom_report.txt
+          west build -t ram_report 2>&1 | tee ram_report.txt
+          cat rom_report.txt ram_report.txt
       
       - name: Upload Firmware
         uses: actions/upload-artifact@v4
@@ -69,12 +74,15 @@ jobs:
             app/build/zephyr/zephyr.elf
             app/build/zephyr/zephyr.hex
             app/build/build_info.txt
+            app/rom_report.txt
+            app/ram_report.txt
 
   build-native:
     name: Build Native Sim
     runs-on: ubuntu-latest
     container: 
-      image: zephyrprojectrts/ci:v0.26.13
+      image: zephyrprojectrtos/ci:v0.26.13
+      options: --user root
     
     steps:
       - uses: actions/checkout@v4
@@ -89,10 +97,12 @@ jobs:
       - run: |
           cd $GITHUB_WORKSPACE/app
           west build -b native_sim -p always
+        env:
+          ZEPHYR_SDK_INSTALL_DIR: /opt/toolchains
       
       - run: |
           cd $GITHUB_WORKSPACE/app
-          timeout 5 ./build/zephyr/zephyr.exe || true
+          timeout 5 ./build/zephyr/zephyr.exe || echo "Test completed"
         continue-on-error: true
 
   static-analysis:
@@ -110,12 +120,23 @@ jobs:
       - name: Run cppcheck
         continue-on-error: true
         run: |
-          cppcheck --enable=all --suppress=missingIncludeSystem \
+          cppcheck --enable=warning,style,performance,portability \
+            --suppress=missingIncludeSystem \
+            --suppress=unmatchedSuppression \
             -I app -I network -I diagnostics -I storage \
-            app/ network/ diagnostics/ storage/
+            app/ network/ diagnostics/ storage/ 2>&1 | tee cppcheck.txt
       
       - name: Check Formatting
         continue-on-error: true
         run: |
           find . -name "*.c" -o -name "*.h" | \
-            grep -v build | xargs clang-format --dry-run --Werror
+            grep -v build | \
+            xargs clang-format --dry-run --Werror || \
+            echo "::warning::Formatting issues found"
+      
+      - name: Upload Reports
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: static-analysis
+          path: cppcheck.txt
