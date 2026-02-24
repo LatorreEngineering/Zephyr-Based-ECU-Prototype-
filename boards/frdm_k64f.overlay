@@ -1,7 +1,15 @@
 /* SPDX-License-Identifier: Apache-2.0 */
-/* FRDM-K64F Board Overlay for ECU Prototype */
+/*
+ * FRDM-K64F Device Tree Overlay for Zephyr ECU Prototype
+ * Compatible with Zephyr v3.7+
+ */
 
-/* Enable FlexCAN0 */
+/* 
+ * FlexCAN Controller Configuration
+ * Node: flexcan0 (not can0 in Zephyr v3.7+)
+ * Pins: PTE24 (TX), PTE25 (RX)
+ * Bitrate: 500 kbps
+ */
 &flexcan0 {
     status = "okay";
     bus-speed = <500000>;
@@ -9,23 +17,35 @@
     sample-point = <875>;
 };
 
-/* Enable UART3 for LIN */
+/* 
+ * UART3 Configuration for LIN Bus
+ * Pins: PTC16 (TX), PTC17 (RX)
+ * Baud Rate: 19200 bps
+ */
 &uart3 {
     status = "okay";
     current-speed = <19200>;
 };
 
-/* Flash partition for NVS storage */
+/*
+ * Flash Partitioning for Non-Volatile Storage (NVS)
+ * Total Flash: 1MB (0x00000000 - 0x000FFFFF)
+ * NVS Partition: 16KB at end of flash (0x000FC000 - 0x000FFFFF)
+ */
 &flash0 {
     partitions {
         compatible = "fixed-partitions";
         #address-cells = <1>;
         #size-cells = <1>;
 
-        /* Reserve 16KB at the end of flash for storage */
+        /* 
+         * Storage partition for DTC persistence
+         * Location: Last 16KB of flash
+         * Size: 0x4000 (16KB)
+         */
         storage_partition: partition@fc000 {
             label = "storage";
-            reg = <0x000fc000 0x00004000>;
+            reg = <0x000FC000 0x00004000>;
         };
     };
 };
