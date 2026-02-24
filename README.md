@@ -134,8 +134,7 @@ zephyr-ecu-prototype/
 ```
 
 ---
-
-## ⚡ Quick Start
+## 🚀 Quick Start
 
 ### Prerequisites
 
@@ -147,7 +146,7 @@ Before building, ensure you have:
 - **Git**
 - **west** tool: `pip3 install west`
 
-### Option 1: Native Installation (Recommended)
+### Build Instructions
 ```bash
 # Step 1: Create workspace directory
 mkdir ~/zephyr-ecu-workspace
@@ -158,10 +157,10 @@ git clone https://github.com/LatorreEngineering/Zephyr-Based-ECU-Prototype-.git 
 
 # Step 3: Initialize west workspace
 west init -l app
-west update
+west update --narrow -o=--depth=1
 
 # Step 4: Install Python dependencies
-pip3 install -r app/requirements.txt
+pip3 install -r zephyr/scripts/requirements.txt
 
 # Step 5: Build for FRDM-K64F
 cd app
@@ -179,22 +178,30 @@ screen /dev/ttyACM0 115200
 **Expected build time:** 2-3 minutes (clean build)  
 **Expected output size:** ~120KB flash, ~45KB RAM
 
-### Option 2: Docker
-```bash
-# Build container
-docker build -t zephyr-ecu:latest .
+### Expected Serial Output
 
-# Run interactive session
-docker run -it --rm \
-  -v $(pwd):/workspace \
-  -v ~/.ccache:/workspace/.ccache \
-  zephyr-ecu:latest
-
-# Inside container
-cd /workspace
-west build -b frdm_k64f -p always
+When successfully running on hardware, you should see:
+```
+*** Booting Zephyr OS build v3.7.0 ***
+Starting Zephyr ECU Prototype
+CAN initialized successfully
+LIN driver initialized
+NVS initialized successfully
+UDS services registered
+UDS server initialized
+Communication manager initialized
 ```
 
+### CI/CD Status
+
+The project includes automated GitHub Actions workflows:
+
+- ✅ Build for FRDM-K64F target
+- ✅ Build for Native Sim (testing)
+- ✅ Static analysis (cppcheck)
+- ✅ Code formatting checks
+
+**Status**: [![CI](https://github.com/LatorreEngineering/Zephyr-Based-ECU-Prototype-/workflows/CI/badge.svg)](https://github.com/LatorreEngineering/Zephyr-Based-ECU-Prototype-/actions)
 ---
 
 ## 🔧 Build System
