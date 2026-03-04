@@ -1,8 +1,14 @@
 # SPDX-License-Identifier: Apache-2.0
 # Zephyr-Based ECU Prototype - Root CMakeLists.txt
-
+# Aligned with Volvo Non-AUTOSAR RFI Architecture
+# === INTEGRATION NOTE: OpenSOME/IP Zephyr module added (must be BEFORE find_package) ===
 
 cmake_minimum_required(VERSION 3.20.0)
+
+# ============================================================================
+# OpenSOME/IP MODULE INTEGRATION (production-ready, brought by submodule)
+# ============================================================================
+list(APPEND ZEPHYR_EXTRA_MODULES ${CMAKE_CURRENT_SOURCE_DIR}/modules/lib/opensomeip)
 
 # ============================================================================
 # PROJECT METADATA & VERSION CONTROL
@@ -74,6 +80,7 @@ target_sources(app PRIVATE
     app/ecu_state_machine.c
     app/sensor_sim.c
     app/watchdog_supervisor.c
+    app/someip_runner.cpp          # <<< NEW: OpenSOME/IP Zephyr thread (C++)
 )
 
 if(ENABLE_FAULT_INJECTION)
@@ -145,7 +152,7 @@ endif()
 # EXPERIMENTAL CI FEATURES
 # ============================================================================
 if(ENABLE_EXPERIMENTAL_MODE)
-    message(STATUS "🧪 Experimental mode enabled for CI")
+    message(STATUS "Experimental mode enabled for CI")
     zephyr_compile_definitions(EXPERIMENTAL_MODE=1)
     
     # Enable performance monitoring
@@ -177,6 +184,6 @@ file(WRITE ${CMAKE_BINARY_DIR}/build_info.txt
 # TESTING SUPPORT
 # ============================================================================
 if(BUILD_TESTS)
-    message(STATUS "🧪 Building tests instead of main application")
+    message(STATUS "Building tests instead of main application")
     # Test builds will use separate CMakeLists in tests/ subdirectories
 endif()
