@@ -1,6 +1,5 @@
 # SPDX-License-Identifier: Apache-2.0
 # Zephyr-Based ECU Prototype - Root CMakeLists.txt
-# Aligned with Volvo Non-AUTOSAR RFI Architecture
 # === INTEGRATION NOTE: OpenSOME/IP Zephyr module added (must be BEFORE find_package) ===
 
 cmake_minimum_required(VERSION 3.20.0)
