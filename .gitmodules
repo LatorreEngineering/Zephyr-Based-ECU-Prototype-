@@ -1,0 +1,4 @@
+[submodule "modules/lib/opensomeip"]
+	path = modules/lib/opensomeip
+	url = https://github.com/LatorreEngineering/opensomeip-zephyr.git
+	branch = main
