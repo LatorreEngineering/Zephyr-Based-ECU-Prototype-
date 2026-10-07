@@ -5,7 +5,7 @@
 [![Zephyr](https://img.shields.io/badge/Zephyr-v3.7-blue)](https://github.com/zephyrproject-rtos/zephyr)
 [![Build Status](https://img.shields.io/badge/build-passing-brightgreen.svg)](https://github.com/LatorreEngineering/Zephyr-Based-ECU-Prototype-)
 
-**Production-ready automotive ECU architecture on Zephyr RTOS**  
+**A prototype automotive ECU architecture on Zephyr RTOS**  
 **Aligned with OSS_SDV Raul Latorre Platform Vision**
 
 ---
@@ -17,7 +17,7 @@ This project demonstrates a **fully functional automotive-style ECU** implemente
 ✅ **Complete UDS diagnostics stack** (ISO 14229) - 13 services  
 ✅ **Multi-protocol support** - CAN, LIN, ISO-TP  
 ✅ **Safety-oriented design** - Watchdog, fault injection, DTC management  
-✅ **Production CI/CD pipeline** - Reproducible builds, automated testing  
+✅ **Automated CI/CD pipeline** - Reproducible builds, automated testing  
 ✅ **Modular architecture** - AUTOSAR-inspired layer separation  
 ✅ **Aligned with OSS_SDV Raul Latorre Platform Vision**   
 ✅ **Fully buildable** - All dependencies resolved, compiles cleanly
@@ -44,7 +44,7 @@ Complete implementation of 13 UDS services with proper error handling:
 | 0x19 | Read DTC | ✅ | Fault code reporting |
 | 0x22 | Read Data By Identifier | ✅ | RPM, temp, voltage |
 | 0x23 | Read Memory By Address | ✅ | Memory access |
-| 0x27 | Security Access (Seed/Key) | ✅ | XOR-based authentication |
+| 0x27 | Security Access (Seed/Key) | ✅ | XOR-based challenge-response — **not cryptographically secure**, see [Security](#-security) |
 | 0x28 | Communication Control | ✅ | Network control |
 | 0x2E | Write Data By Identifier | ✅ | Parameter writing |
 | 0x31 | Routine Control | ✅ | Function execution |
@@ -407,7 +407,15 @@ Comprehensive documentation available in `docs/`:
 - ✅ All compilation issues resolved
 - ✅ Hardware-verified functionality
 
-### Phase 2: Maturation (Q2-Q3 2025)
+### Beyond Phase 1 — unscheduled, not started
+
+This was originally dated Q2 2025 through Q2 2026 across three phases. None
+of those dates were met and none of this work has started — this is an
+unfunded, part-time personal project with no committed timeline, not a
+funded roadmap. Kept below as a list of what a real production path would
+require, not as a schedule.
+
+**Maturation**
 - ⬜ Multi-core support (AMP/SMP)
 - ⬜ Secure boot (MCUboot integration)
 - ⬜ OTA firmware updates
@@ -416,16 +424,16 @@ Comprehensive documentation available in `docs/`:
 - ⬜ CAN-FD support
 - ⬜ J1939 protocol stack
 
-### Phase 3: Safety Certification (Q4 2025 - Q1 2026)
+**Safety certification**
 - ⬜ ASIL-B compliance path
 - ⬜ Formal verification (model checking)
 - ⬜ Safety manual (ISO 26262)
 - ⬜ Tool qualification
 - ⬜ Independent safety audit
 
-### Phase 4: Production Readiness (Q2 2026)
+**Production readiness**
 - ⬜ Hardware security module (HSM) integration
-- ⬜ Secure key storage
+- ⬜ Secure key storage (replacing the XOR placeholder — see Security below)
 - ⬜ Production trace logging
 - ⬜ Field update infrastructure
 - ⬜ Manufacturing test suite
@@ -434,8 +442,19 @@ Comprehensive documentation available in `docs/`:
 
 ## 🔒 Security
 
+> ⚠️ **The SecurityAccess (UDS 0x27) implementation is a development placeholder,
+> not a real security mechanism.** The seed/key algorithm is a plain XOR —
+> trivially reversible from a handful of observed seed/key pairs, with no key
+> diversification, no hardware root of trust, and no protection against replay.
+> It demonstrates the *protocol state machine* (session gating, attempt
+> counters, NRCs), not a secure implementation. **Do not use this as-is on
+> anything connected to a real vehicle network or treat it as a security
+> control.** A real deployment needs an OEM-grade algorithm (e.g. AES-CMAC,
+> per ISO 14229-1) and a hardware-backed key store — both currently unbuilt,
+> see "Production readiness" in the [Roadmap](#-zephyr-based-ecu-development-roadmap).
+
 ### Implemented Security Features:
-- ✅ **Seed/Key Authentication** (UDS 0x27): XOR-based challenge-response
+- ✅ **Seed/Key Authentication** (UDS 0x27): XOR-based challenge-response — placeholder, see warning above
 - ✅ **Session Management**: Access control per diagnostic session
 - ✅ **Memory Protection**: MPU-enabled flash write protection
 - ✅ **Request Validation**: Input sanitization, length checks
@@ -616,7 +635,14 @@ See [LICENSE](LICENSE) for details.
 | CI/CD | ✅ Passing | Automated builds and tests |
 | Hardware Testing | ✅ Verified | FRDM-K64F validated |
 
-**Overall Status**: ✅ **PRODUCTION READY** (with external transceivers for CAN/LIN)
+**Overall Status**: 🧪 **Prototype / reference implementation — not production-ready.**
+All components above build, run, and have been exercised on the target
+hardware as described, but "working in this prototype" and "ready for a
+production vehicle" are different claims — see [Security](#-security) (the
+SecurityAccess implementation is a placeholder, not real security) and the
+[roadmap](#-zephyr-based-ecu-development-roadmap) above for what's actually
+missing (safety certification, a real crypto-backed SecurityAccess, secure
+boot, HSM-backed key storage) before this could be considered for one.
 
 ---
 
