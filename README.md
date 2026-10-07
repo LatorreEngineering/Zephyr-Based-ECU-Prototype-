@@ -6,7 +6,7 @@
 [![Build Status](https://img.shields.io/badge/build-passing-brightgreen.svg)](https://github.com/LatorreEngineering/Zephyr-Based-ECU-Prototype-)
 
 **A prototype automotive ECU architecture on Zephyr RTOS**  
-**Aligned with OSS_SDV Raul Latorre Platform Vision**
+
 
 ---
 
